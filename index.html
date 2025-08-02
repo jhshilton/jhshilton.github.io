@@ -5,14 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gerenciador de Obras Hilton</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Firebase para armazenamento em nuvem -->
+    <!-- Firebase para sincronização em tempo real -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
         body { font-family: 'Arial', sans-serif; }
-        .obra-card { transition: all 0.3s; }
-        .obra-card:hover { transform: translateY(-2px); }
-        .active-obra { border-left: 4px solid #3B82F6; }
+        .loading-spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top: 4px solid #3B82F6;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -34,9 +43,15 @@
 
     <!-- Aplicativo Principal -->
     <div id="app" class="hidden container mx-auto p-4">
-        <!-- Cabeçalho -->
+        <!-- Cabeçalho com status de sincronização -->
         <header class="flex justify-between items-center mb-6">
-            <h1 class="text-2xl font-bold">Controle Financeiro de Obras</h1>
+            <div>
+                <h1 class="text-2xl font-bold">Controle Financeiro de Obras</h1>
+                <div id="sync-status" class="flex items-center text-sm text-gray-600">
+                    <div class="loading-spinner mr-2 hidden"></div>
+                    <span>Carregando dados...</span>
+                </div>
+            </div>
             <button id="nova-obra-btn" class="bg-green-600 text-white px-4 py-2 rounded">
                 + Nova Obra
             </button>
@@ -48,8 +63,7 @@
             <div class="w-full md:w-1/3 bg-white p-4 rounded-lg shadow">
                 <h2 class="text-xl font-semibold mb-4">Suas Obras</h2>
                 <div id="obras-list" class="space-y-2">
-                    <!-- Obras serão carregadas aqui -->
-                    <div class="text-center py-4 text-gray-500">Nenhuma obra cadastrada</div>
+                    <div class="text-center py-4 text-gray-500">Carregando obras...</div>
                 </div>
             </div>
 
@@ -148,7 +162,7 @@
     </div>
 
     <script>
-        // Configuração do Firebase (substitua com suas credenciais)
+        // 1. Configuração do Firebase (SUBSTITUA COM SUAS CREDENCIAIS)
         const firebaseConfig = {
             apiKey: "SUA_API_KEY",
             authDomain: "SEU_PROJETO.firebaseapp.com",
@@ -163,32 +177,36 @@
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
-        // Configurações
+        // 2. Configurações do Aplicativo
         const SENHA_CORRETA = "Leticia180977";
         const DADOS_LOCAIS = "hilton_obras_data";
         
-        // Estado do aplicativo
+        // 3. Estado do Aplicativo
         let userData = {
             obras: [],
             obraSelecionada: null
         };
 
-        // Inicialização
+        // 4. Variável para controle do listener do Firebase
+        let firebaseListener = null;
+
+        // 5. Inicialização do Aplicativo
         document.addEventListener('DOMContentLoaded', () => {
-            // Login
+            // Configura o formulário de login
             document.getElementById('login-form').addEventListener('submit', (e) => {
                 e.preventDefault();
                 const senha = document.getElementById('password').value;
                 if (senha === SENHA_CORRETA) {
+                    mostrarCarregamento("Conectando ao servidor...");
                     document.getElementById('login-screen').classList.add('hidden');
                     document.getElementById('app').classList.remove('hidden');
-                    carregarDados();
+                    iniciarAplicativo();
                 } else {
                     alert("Senha incorreta!");
                 }
             });
 
-            // Nova Obra
+            // Configura o modal de nova obra
             document.getElementById('nova-obra-btn').addEventListener('click', () => {
                 document.getElementById('modal-nova-obra').classList.remove('hidden');
             });
@@ -200,26 +218,10 @@
 
             document.getElementById('form-nova-obra').addEventListener('submit', (e) => {
                 e.preventDefault();
-                const novaObra = {
-                    id: Date.now().toString(),
-                    nome: document.getElementById('obra-nome').value,
-                    valorInicial: parseFloat(document.getElementById('obra-valor').value) || 0,
-                    servicos: [],
-                    vales: [],
-                    dataCriacao: new Date().toISOString(),
-                    status: 'andamento' // 'andamento' ou 'concluida'
-                };
-                
-                userData.obras.push(novaObra);
-                userData.obraSelecionada = novaObra.id;
-                
-                salvarDados();
-                document.getElementById('modal-nova-obra').classList.add('hidden');
-                document.getElementById('form-nova-obra').reset();
-                atualizarInterface();
+                adicionarNovaObra();
             });
 
-            // Novo Serviço
+            // Configura o modal de novo serviço
             document.getElementById('cancelar-servico').addEventListener('click', () => {
                 document.getElementById('modal-novo-servico').classList.add('hidden');
                 document.getElementById('form-novo-servico').reset();
@@ -227,23 +229,10 @@
 
             document.getElementById('form-novo-servico').addEventListener('submit', (e) => {
                 e.preventDefault();
-                const obra = userData.obras.find(o => o.id === userData.obraSelecionada);
-                if (obra) {
-                    obra.servicos.push({
-                        id: Date.now().toString(),
-                        descricao: document.getElementById('servico-descricao').value,
-                        valor: parseFloat(document.getElementById('servico-valor').value) || 0,
-                        data: document.getElementById('servico-data').value
-                    });
-                    
-                    salvarDados();
-                    document.getElementById('modal-novo-servico').classList.add('hidden');
-                    document.getElementById('form-novo-servico').reset();
-                    atualizarInterface();
-                }
+                adicionarNovoServico();
             });
 
-            // Novo Vale
+            // Configura o modal de novo vale
             document.getElementById('cancelar-vale').addEventListener('click', () => {
                 document.getElementById('modal-novo-vale').classList.add('hidden');
                 document.getElementById('form-novo-vale').reset();
@@ -251,63 +240,131 @@
 
             document.getElementById('form-novo-vale').addEventListener('submit', (e) => {
                 e.preventDefault();
-                const obra = userData.obras.find(o => o.id === userData.obraSelecionada);
-                if (obra) {
-                    obra.vales.push({
-                        id: Date.now().toString(),
-                        descricao: document.getElementById('vale-descricao').value,
-                        valor: parseFloat(document.getElementById('vale-valor').value) || 0,
-                        data: document.getElementById('vale-data').value
-                    });
-                    
-                    salvarDados();
-                    document.getElementById('modal-novo-vale').classList.add('hidden');
-                    document.getElementById('form-novo-vale').reset();
-                    atualizarInterface();
-                }
+                adicionarNovoVale();
             });
         });
 
-        // Funções do sistema
-        function carregarDados() {
-            // Tenta carregar da nuvem primeiro
-            database.ref('obras/' + btoa(SENHA_CORRETA)).once('value')
-                .then(snapshot => {
-                    const dados = snapshot.val();
-                    if (dados) {
-                        userData = dados;
-                        atualizarInterface();
-                    } else {
-                        // Se não tiver na nuvem, tenta local
-                        const dadosLocais = localStorage.getItem(DADOS_LOCAIS);
-                        if (dadosLocais) {
-                            userData = JSON.parse(dadosLocais);
-                            atualizarInterface();
-                        }
-                    }
-                })
-                .catch(error => {
-                    console.error("Erro ao carregar da nuvem:", error);
-                    // Fallback para localStorage
+        // 6. Funções Principais
+        function iniciarAplicativo() {
+            // Configura o listener do Firebase para sincronização em tempo real
+            configurarFirebaseListener();
+        }
+
+        function configurarFirebaseListener() {
+            // Remove o listener anterior se existir
+            if (firebaseListener) {
+                firebaseListener();
+            }
+            
+            mostrarCarregamento("Sincronizando dados...");
+            
+            // Cria um novo listener para atualizações em tempo real
+            firebaseListener = database.ref('obras/' + btoa(SENHA_CORRETA)).on('value', (snapshot) => {
+                const dadosRemotos = snapshot.val();
+                
+                if (dadosRemotos) {
+                    userData = dadosRemotos;
+                    mostrarMensagem("Dados sincronizados com sucesso!");
+                    atualizarInterface();
+                    
+                    // Salva também localmente como backup
+                    localStorage.setItem(DADOS_LOCAIS, JSON.stringify(userData));
+                } else {
+                    // Se não houver dados no Firebase, tenta carregar do localStorage
                     const dadosLocais = localStorage.getItem(DADOS_LOCAIS);
                     if (dadosLocais) {
                         userData = JSON.parse(dadosLocais);
+                        salvarDadosNoFirebase(); // Envia os dados locais para a nuvem
+                    } else {
+                        userData = { obras: [], obraSelecionada: null };
+                        mostrarMensagem("Nenhum dado encontrado. Criando novo banco de dados.");
                         atualizarInterface();
                     }
-                });
+                }
+            }, (error) => {
+                console.error("Erro ao sincronizar:", error);
+                mostrarErro("Erro de conexão. Usando dados locais...");
+                
+                // Fallback para localStorage
+                const dadosLocais = localStorage.getItem(DADOS_LOCAIS);
+                if (dadosLocais) {
+                    userData = JSON.parse(dadosLocais);
+                    atualizarInterface();
+                }
+            });
         }
 
-        function salvarDados() {
-            // Salva localmente
-            localStorage.setItem(DADOS_LOCAIS, JSON.stringify(userData));
+        function salvarDadosNoFirebase() {
+            mostrarCarregamento("Salvando dados...");
             
-            // Salva na nuvem
             database.ref('obras/' + btoa(SENHA_CORRETA)).set(userData)
+                .then(() => {
+                    mostrarMensagem("Dados salvos na nuvem!");
+                })
                 .catch(error => {
                     console.error("Erro ao salvar na nuvem:", error);
+                    mostrarErro("Erro ao salvar na nuvem. Dados serão armazenados localmente.");
+                    
+                    // Fallback para localStorage
+                    localStorage.setItem(DADOS_LOCAIS, JSON.stringify(userData));
                 });
         }
 
+        function adicionarNovaObra() {
+            const novaObra = {
+                id: Date.now().toString(),
+                nome: document.getElementById('obra-nome').value,
+                valorInicial: parseFloat(document.getElementById('obra-valor').value) || 0,
+                servicos: [],
+                vales: [],
+                dataCriacao: new Date().toISOString(),
+                status: 'andamento'
+            };
+            
+            userData.obras.push(novaObra);
+            userData.obraSelecionada = novaObra.id;
+            
+            document.getElementById('modal-nova-obra').classList.add('hidden');
+            document.getElementById('form-nova-obra').reset();
+            
+            salvarDadosNoFirebase();
+        }
+
+        function adicionarNovoServico() {
+            const obra = userData.obras.find(o => o.id === userData.obraSelecionada);
+            if (obra) {
+                obra.servicos.push({
+                    id: Date.now().toString(),
+                    descricao: document.getElementById('servico-descricao').value,
+                    valor: parseFloat(document.getElementById('servico-valor').value) || 0,
+                    data: document.getElementById('servico-data').value
+                });
+                
+                document.getElementById('modal-novo-servico').classList.add('hidden');
+                document.getElementById('form-novo-servico').reset();
+                
+                salvarDadosNoFirebase();
+            }
+        }
+
+        function adicionarNovoVale() {
+            const obra = userData.obras.find(o => o.id === userData.obraSelecionada);
+            if (obra) {
+                obra.vales.push({
+                    id: Date.now().toString(),
+                    descricao: document.getElementById('vale-descricao').value,
+                    valor: parseFloat(document.getElementById('vale-valor').value) || 0,
+                    data: document.getElementById('vale-data').value
+                });
+                
+                document.getElementById('modal-novo-vale').classList.add('hidden');
+                document.getElementById('form-novo-vale').reset();
+                
+                salvarDadosNoFirebase();
+            }
+        }
+
+        // 7. Funções de Atualização da Interface
         function atualizarInterface() {
             atualizarListaObras();
             atualizarDetalhesObra();
@@ -322,7 +379,7 @@
             }
             
             obrasList.innerHTML = userData.obras.map(obra => `
-                <div class="obra-card p-3 border rounded cursor-pointer ${userData.obraSelecionada === obra.id ? 'bg-blue-50 active-obra' : 'bg-white'}" 
+                <div class="p-3 border rounded cursor-pointer mb-2 ${userData.obraSelecionada === obra.id ? 'bg-blue-50 border-blue-200' : 'bg-white'}" 
                      data-id="${obra.id}">
                     <div class="flex justify-between items-center">
                         <h3 class="font-medium">${obra.nome}</h3>
@@ -330,16 +387,15 @@
                             ${obra.status === 'concluida' ? 'Concluída' : 'Em andamento'}
                         </span>
                     </div>
-                    <p class="text-sm text-gray-600 mt-1">Criada em: ${formatDate(obra.dataCriacao)}</p>
+                    <p class="text-sm text-gray-600 mt-1">Valor: ${formatCurrency(obra.valorInicial)}</p>
                 </div>
             `).join('');
             
             // Adiciona eventos de clique
-            document.querySelectorAll('.obra-card').forEach(card => {
+            document.querySelectorAll('#obras-list > div').forEach(card => {
                 card.addEventListener('click', (e) => {
                     userData.obraSelecionada = e.currentTarget.dataset.id;
-                    salvarDados();
-                    atualizarInterface();
+                    salvarDadosNoFirebase();
                 });
             });
         }
@@ -435,7 +491,7 @@
                 </div>
             `;
             
-            // Adiciona eventos aos botões
+            // Configura eventos dos botões
             if (document.getElementById('novo-servico-btn')) {
                 document.getElementById('novo-servico-btn').addEventListener('click', () => {
                     document.getElementById('modal-novo-servico').classList.remove('hidden');
@@ -453,10 +509,32 @@
             if (document.getElementById('concluir-obra-btn') && obra.status !== 'concluida') {
                 document.getElementById('concluir-obra-btn').addEventListener('click', () => {
                     obra.status = 'concluida';
-                    salvarDados();
-                    atualizarInterface();
+                    salvarDadosNoFirebase();
                 });
             }
+        }
+
+        // 8. Funções Auxiliares
+        function mostrarCarregamento(mensagem) {
+            const statusElement = document.getElementById('sync-status');
+            statusElement.innerHTML = `
+                <div class="loading-spinner mr-2"></div>
+                <span>${mensagem}</span>
+            `;
+        }
+
+        function mostrarMensagem(mensagem) {
+            const statusElement = document.getElementById('sync-status');
+            statusElement.innerHTML = `
+                <span class="text-green-600">✓ ${mensagem}</span>
+            `;
+        }
+
+        function mostrarErro(mensagem) {
+            const statusElement = document.getElementById('sync-status');
+            statusElement.innerHTML = `
+                <span class="text-red-600">✗ ${mensagem}</span>
+            `;
         }
 
         function formatCurrency(value) {
