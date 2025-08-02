@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciador de Obras Hilton</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #f3f4f6; 
+        }
+        .container { 
+            max-width: 640px; 
+            margin: 0 auto; 
+        }
+        .input-field {
+            width: 100%; 
+            padding: 10px; 
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem; 
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        #foto-obra {
+            max-width: 100%;
+            height: auto;
+            border-radius: 0.5rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4">
+    <!-- Tela de Login -->
+    <div id="login-screen" class="flex items-center justify-center h-screen">
+        <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
+            <h1 class="text-2xl font-bold text-center mb-6">Acesso Restrito</h1>
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Senha:</label>
+                    <input type="password" id="password" class="input-field" required>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                    Entrar
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Aplicativo Principal -->
+    <div id="app" class="hidden container">
+        <!-- Cabeçalho -->
+        <header class="text-center mt-8 mb-6">
+            <h1 class="text-3xl font-bold text-gray-900">Gerenciador de Obras</h1>
+            <p class="text-gray-600 mt-2">Controle financeiro completo</p>
+        </header>
+
+        <!-- Seção de Backup -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Backup Online</h2>
+            <div class="flex space-x-4">
+                <button id="backup-btn" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors">
+                    Fazer Backup
+                </button>
+                <button id="restore-btn" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
+                    Restaurar
+                </button>
+            </div>
+            <p id="backup-status" class="text-sm text-gray-500 mt-2"></p>
+        </div>
+
+        <!-- Upload de Fotos -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Fotos da Obra</h2>
+            <input type="file" id="foto-input" accept="image/*" class="hidden">
+            <button id="upload-btn" class="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transition-colors mb-4">
+                Adicionar Foto
+            </button>
+            <div id="foto-container" class="mt-4">
+                <img id="foto-obra" src="" alt="Foto da obra" class="hidden">
+            </div>
+        </div>
+
+        <!-- Notificações -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Configurações de Notificação</h2>
+            <div class="flex items-center">
+                <input type="checkbox" id="notificacoes-ativa" class="mr-2">
+                <label for="notificacoes-ativa">Receber alertas de saldo</label>
+            </div>
+            <div class="mt-4">
+                <label class="block text-sm font-medium mb-1">Valor mínimo para alerta (R$):</label>
+                <input type="number" id="valor-alerta" value="1000" class="input-field">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configurações do App
+        const SENHA_CORRETA = "Leticia180977";
+        const DADOS_LOCAIS = "hilton_obra_data";
+        const BACKUP_KEY = "backup_id";
+
+        // Elementos da UI
+        const loginScreen = document.getElementById('login-screen');
+        const app = document.getElementById('app');
+        const backupBtn = document.getElementById('backup-btn');
+        const restoreBtn = document.getElementById('restore-btn');
+        const backupStatus = document.getElementById('backup-status');
+        const uploadBtn = document.getElementById('upload-btn');
+        const fotoInput = document.getElementById('foto-input');
+        const fotoObra = document.getElementById('foto-obra');
+        const notificacoesAtiva = document.getElementById('notificacoes-ativa');
+        const valorAlerta = document.getElementById('valor-alerta');
+
+        // Firebase Configuration (substitua com suas credenciais)
+        const firebaseConfig = {
+            apiKey: "SUA_API_KEY",
+            authDomain: "SEU_DOMINIO.firebaseapp.com",
+            projectId: "SEU_PROJETO_ID",
+            storageBucket: "SEU_BUCKET.appspot.com",
+            messagingSenderId: "SEU_SENDER_ID",
+            appId: "SEU_APP_ID"
+        };
+
+        // Inicialização do Firebase
+        function inicializarFirebase() {
+            return new Promise((resolve) => {
+                const script = document.createElement('script');
+                script.src = "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+                script.onload = () => {
+                    firebase.initializeApp(firebaseConfig);
+                    resolve();
+                };
+                document.head.appendChild(script);
+            });
+        }
+
+        // Sistema de Login
+        document.getElementById('login-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const senha = document.getElementById('password').value;
+            
+            if (senha === SENHA_CORRETA) {
+                loginScreen.classList.add('hidden');
+                app.classList.remove('hidden');
+                carregarDados();
+                verificarNotificacoes();
+            } else {
+                alert("Senha incorreta!");
+            }
+        });
+
+        // Carrega dados locais
+        function carregarDados() {
+            const dados = localStorage.getItem(DADOS_LOCAIS);
+            if (dados) {
+                console.log("Dados carregados:", JSON.parse(dados));
+                backupStatus.textContent = "Dados locais carregados com sucesso";
+            }
+        }
+
+        // Sistema de Backup Online
+        backupBtn.addEventListener('click', async () => {
+            backupStatus.textContent = "Iniciando backup...";
+            try {
+                await inicializarFirebase();
+                const userId = localStorage.getItem(BACKUP_KEY) || 'user_' + Math.random().toString(36).substr(2, 9);
+                const dados = localStorage.getItem(DADOS_LOCAIS) || '{}';
+                
+                await firebase.database().ref('users/' + userId).set({
+                    dados: dados,
+                    ultimaAtualizacao: new Date().toISOString()
+                });
+                
+                localStorage.setItem(BACKUP_KEY, userId);
+                backupStatus.textContent = `Backup realizado! Seu ID: ${userId}`;
+            } catch (error) {
+                backupStatus.textContent = "Erro no backup: " + error.message;
+            }
+        });
+
+        // Restauração de Backup
+        restoreBtn.addEventListener('click', async () => {
+            const userId = prompt("Digite seu ID de backup:");
+            if (userId) {
+                backupStatus.textContent = "Restaurando dados...";
+                try {
+                    await inicializarFirebase();
+                    const snapshot = await firebase.database().ref('users/' + userId).once('value');
+                    const data = snapshot.val();
+                    
+                    if (data && data.dados) {
+                        localStorage.setItem(DADOS_LOCAIS, data.dados);
+                        localStorage.setItem(BACKUP_KEY, userId);
+                        backupStatus.textContent = "Dados restaurados com sucesso!";
+                        location.reload();
+                    } else {
+                        backupStatus.textContent = "Nenhum dado encontrado para este ID";
+                    }
+                } catch (error) {
+                    backupStatus.textContent = "Erro na restauração: " + error.message;
+                }
+            }
+        });
+
+        // Upload de Fotos
+        uploadBtn.addEventListener('click', () => {
+            fotoInput.click();
+        });
+
+        fotoInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    fotoObra.src = event.target.result;
+                    fotoObra.classList.remove('hidden');
+                    // Aqui você pode implementar o upload para o Firebase Storage
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Sistema de Notificações
+        function verificarNotificacoes() {
+            if (Notification.permission !== "granted") {
+                Notification.requestPermission();
+            }
+            
+            // Verificação periódica do saldo
+            setInterval(() => {
+                if (notificacoesAtiva.checked) {
+                    const saldo = calcularSaldo(); // Implemente esta função
+                    const limite = parseFloat(valorAlerta.value) || 1000;
+                    
+                    if (saldo < limite) {
+                        mostrarNotificacao(`Atenção: Saldo abaixo de R$ ${limite.toFixed(2)}`);
+                    }
+                }
+            }, 3600000); // Verifica a cada hora
+        }
+
+        function mostrarNotificacao(mensagem) {
+            if (Notification.permission === "granted") {
+                new Notification(mensagem);
+            } else if (document.hidden) {
+                alert(mensagem); // Fallback se notificações não permitidas
+            }
+        }
+
+        // Inicialização
+        if (localStorage.getItem(DADOS_LOCAIS)) {
+            loginScreen.classList.add('hidden');
+            app.classList.remove('hidden');
+            carregarDados();
+            verificarNotificacoes();
+        }
+    </script>
+</body>
+</html>
