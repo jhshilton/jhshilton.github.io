@@ -217,7 +217,7 @@
                 }
             });
 
-            // Configura outros event listeners...
+            // Configura todos os event listeners
             configurarEventListeners();
         });
 
@@ -470,8 +470,18 @@
             return date.toLocaleDateString('pt-BR');
         }
 
+        // 9. Configuração Completa dos Event Listeners
         function configurarEventListeners() {
-            // Configuração dos modais e formulários...
+            // Nova Obra
+            document.getElementById('nova-obra-btn').addEventListener('click', () => {
+                document.getElementById('modal-nova-obra').classList.remove('hidden');
+            });
+
+            document.getElementById('cancelar-obra').addEventListener('click', () => {
+                document.getElementById('modal-nova-obra').classList.add('hidden');
+                document.getElementById('form-nova-obra').reset();
+            });
+
             document.getElementById('form-nova-obra').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const novaObra = {
@@ -499,7 +509,65 @@
                 }
             });
 
-            // ... (configuração similar para os outros formulários)
+            // Novo Serviço
+            document.getElementById('cancelar-servico').addEventListener('click', () => {
+                document.getElementById('modal-novo-servico').classList.add('hidden');
+                document.getElementById('form-novo-servico').reset();
+            });
+
+            document.getElementById('form-novo-servico').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const obra = userData.obras.find(o => o.id === userData.obraSelecionada);
+                if (obra) {
+                    obra.servicos.push({
+                        id: Date.now().toString(),
+                        descricao: document.getElementById('servico-descricao').value,
+                        valor: parseFloat(document.getElementById('servico-valor').value) || 0,
+                        data: document.getElementById('servico-data').value
+                    });
+                    
+                    document.getElementById('modal-novo-servico').classList.add('hidden');
+                    document.getElementById('form-novo-servico').reset();
+                    
+                    try {
+                        await salvarDados();
+                        atualizarInterface();
+                    } catch (error) {
+                        console.error("Erro ao salvar serviço:", error);
+                        mostrarMensagem("Erro ao salvar serviço", true);
+                    }
+                }
+            });
+
+            // Novo Vale
+            document.getElementById('cancelar-vale').addEventListener('click', () => {
+                document.getElementById('modal-novo-vale').classList.add('hidden');
+                document.getElementById('form-novo-vale').reset();
+            });
+
+            document.getElementById('form-novo-vale').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const obra = userData.obras.find(o => o.id === userData.obraSelecionada);
+                if (obra) {
+                    obra.vales.push({
+                        id: Date.now().toString(),
+                        descricao: document.getElementById('vale-descricao').value,
+                        valor: parseFloat(document.getElementById('vale-valor').value) || 0,
+                        data: document.getElementById('vale-data').value
+                    });
+                    
+                    document.getElementById('modal-novo-vale').classList.add('hidden');
+                    document.getElementById('form-novo-vale').reset();
+                    
+                    try {
+                        await salvarDados();
+                        atualizarInterface();
+                    } catch (error) {
+                        console.error("Erro ao salvar vale:", error);
+                        mostrarMensagem("Erro ao salvar vale", true);
+                    }
+                }
+            });
         }
     </script>
 </body>
