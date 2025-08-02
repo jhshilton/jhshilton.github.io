@@ -6,26 +6,13 @@
     <title>Gerenciador de Obras Hilton</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { 
-            font-family: 'Inter', sans-serif; 
-            background-color: #f3f4f6; 
-        }
-        .container { 
-            max-width: 640px; 
-            margin: 0 auto; 
-        }
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .container { max-width: 640px; margin: 0 auto; }
         .input-field {
-            width: 100%; 
-            padding: 10px; 
-            border: 1px solid #d1d5db;
-            border-radius: 0.5rem; 
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            width: 100%; padding: 10px; border: 1px solid #d1d5db;
+            border-radius: 0.5rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
-        #foto-obra {
-            max-width: 100%;
-            height: auto;
-            border-radius: 0.5rem;
-        }
+        #foto-obra { max-width: 100%; height: auto; border-radius: 0.5rem; }
     </style>
 </head>
 <body class="bg-gray-100 p-4">
@@ -53,206 +40,280 @@
             <p class="text-gray-600 mt-2">Controle financeiro completo</p>
         </header>
 
+        <!-- Seção de Detalhes da Obra -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold">Detalhes da Obra</h2>
+                <button id="edit-obra-btn" class="bg-blue-500 text-white rounded-full px-4 py-2 text-sm hover:bg-blue-600 transition-colors">
+                    Editar
+                </button>
+            </div>
+            
+            <!-- Modo Visualização -->
+            <div id="display-obra-data" class="space-y-3">
+                <div class="flex items-center space-x-3 text-lg">
+                    <span class="text-blue-500">🏠</span>
+                    <span><strong>Obra:</strong> <span id="display-obra-nome">N/A</span></span>
+                </div>
+                <div class="flex items-center space-x-3 text-lg">
+                    <span class="text-blue-500">💲</span>
+                    <span><strong>Valor:</strong> <span id="display-obra-valor">R$ 0,00</span></span>
+                </div>
+                <div class="flex items-center space-x-3 text-lg">
+                    <span class="text-blue-500">📏</span>
+                    <span><strong>Metragem:</strong> <span id="display-obra-metro">0 m²</span></span>
+                </div>
+            </div>
+
+            <!-- Modo Edição -->
+            <form id="edit-obra-form" class="hidden space-y-4">
+                <div class="flex flex-col">
+                    <label class="text-sm font-medium mb-1">Nome da Obra:</label>
+                    <input id="input-obra-nome" type="text" class="input-field">
+                </div>
+                <div class="flex flex-col">
+                    <label class="text-sm font-medium mb-1">Valor Total (R$):</label>
+                    <input id="input-obra-valor" type="number" class="input-field">
+                </div>
+                <div class="flex flex-col">
+                    <label class="text-sm font-medium mb-1">Metros Quadrados (m²):</label>
+                    <input id="input-obra-metro" type="number" class="input-field">
+                </div>
+                <button type="submit" class="w-full bg-blue-500 text-white py-2 rounded-lg">
+                    Salvar
+                </button>
+            </form>
+        </div>
+
+        <!-- Seção de Adiantamentos -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Controle de Vales</h2>
+            <form id="add-adiantamento-form" class="space-y-4">
+                <div class="flex flex-col">
+                    <label class="text-sm font-medium mb-1">Data:</label>
+                    <input type="date" name="data" required class="input-field">
+                </div>
+                <div class="flex flex-col">
+                    <label class="text-sm font-medium mb-1">Descrição:</label>
+                    <input type="text" name="descricao" placeholder="Ex: Vale semanal" class="input-field">
+                </div>
+                <div class="flex flex-col">
+                    <label class="text-sm font-medium mb-1">Valor (R$):</label>
+                    <input type="number" name="valor" placeholder="0.00" required class="input-field">
+                </div>
+                <button type="submit" class="w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors">
+                    + Adicionar Vale
+                </button>
+            </form>
+
+            <!-- Lista de Vales -->
+            <div class="mt-6">
+                <h3 class="font-medium mb-2">Histórico de Vales</h3>
+                <ul id="adiantamentos-list" class="divide-y divide-gray-200">
+                    <li class="py-4 text-center text-gray-500">Nenhum vale registrado</li>
+                </ul>
+            </div>
+        </div>
+
         <!-- Seção de Backup -->
         <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
             <h2 class="text-xl font-semibold mb-4">Backup Online</h2>
             <div class="flex space-x-4">
-                <button id="backup-btn" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors">
+                <button id="backup-btn" class="bg-green-500 text-white px-4 py-2 rounded-lg">
                     Fazer Backup
                 </button>
-                <button id="restore-btn" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
+                <button id="restore-btn" class="bg-blue-500 text-white px-4 py-2 rounded-lg">
                     Restaurar
                 </button>
             </div>
             <p id="backup-status" class="text-sm text-gray-500 mt-2"></p>
         </div>
 
-        <!-- Upload de Fotos -->
+        <!-- Resumo Financeiro -->
         <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-            <h2 class="text-xl font-semibold mb-4">Fotos da Obra</h2>
-            <input type="file" id="foto-input" accept="image/*" class="hidden">
-            <button id="upload-btn" class="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transition-colors mb-4">
-                Adicionar Foto
-            </button>
-            <div id="foto-container" class="mt-4">
-                <img id="foto-obra" src="" alt="Foto da obra" class="hidden">
-            </div>
-        </div>
-
-        <!-- Notificações -->
-        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-            <h2 class="text-xl font-semibold mb-4">Configurações de Notificação</h2>
-            <div class="flex items-center">
-                <input type="checkbox" id="notificacoes-ativa" class="mr-2">
-                <label for="notificacoes-ativa">Receber alertas de saldo</label>
-            </div>
-            <div class="mt-4">
-                <label class="block text-sm font-medium mb-1">Valor mínimo para alerta (R$):</label>
-                <input type="number" id="valor-alerta" value="1000" class="input-field">
+            <h2 class="text-xl font-semibold mb-4">Resumo Financeiro</h2>
+            <div class="grid grid-cols-3 gap-4 text-center">
+                <div class="bg-gray-50 p-4 rounded-xl">
+                    <p class="text-sm font-medium text-gray-500">Total da Obra</p>
+                    <p id="total-obra" class="text-lg font-bold">R$ 0,00</p>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-xl">
+                    <p class="text-sm font-medium text-gray-500">Total Vales</p>
+                    <p id="total-vales" class="text-lg font-bold">R$ 0,00</p>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-xl">
+                    <p class="text-sm font-medium text-gray-500">Saldo</p>
+                    <p id="saldo" class="text-lg font-bold">R$ 0,00</p>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        // Configurações do App
+        // Configurações
         const SENHA_CORRETA = "Leticia180977";
         const DADOS_LOCAIS = "hilton_obra_data";
-        const BACKUP_KEY = "backup_id";
-
-        // Elementos da UI
-        const loginScreen = document.getElementById('login-screen');
-        const app = document.getElementById('app');
-        const backupBtn = document.getElementById('backup-btn');
-        const restoreBtn = document.getElementById('restore-btn');
-        const backupStatus = document.getElementById('backup-status');
-        const uploadBtn = document.getElementById('upload-btn');
-        const fotoInput = document.getElementById('foto-input');
-        const fotoObra = document.getElementById('foto-obra');
-        const notificacoesAtiva = document.getElementById('notificacoes-ativa');
-        const valorAlerta = document.getElementById('valor-alerta');
-
-        // Firebase Configuration (substitua com suas credenciais)
-        const firebaseConfig = {
-            apiKey: "SUA_API_KEY",
-            authDomain: "SEU_DOMINIO.firebaseapp.com",
-            projectId: "SEU_PROJETO_ID",
-            storageBucket: "SEU_BUCKET.appspot.com",
-            messagingSenderId: "SEU_SENDER_ID",
-            appId: "SEU_APP_ID"
+        
+        // Estado do aplicativo
+        let userData = {
+            obra: {
+                nome: "",
+                valor: 0,
+                metroQuadrado: 0
+            },
+            vales: []
         };
 
-        // Inicialização do Firebase
-        function inicializarFirebase() {
-            return new Promise((resolve) => {
-                const script = document.createElement('script');
-                script.src = "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-                script.onload = () => {
-                    firebase.initializeApp(firebaseConfig);
-                    resolve();
-                };
-                document.head.appendChild(script);
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', () => {
+            // Login
+            document.getElementById('login-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                if (document.getElementById('password').value === SENHA_CORRETA) {
+                    document.getElementById('login-screen').classList.add('hidden');
+                    document.getElementById('app').classList.remove('hidden');
+                    carregarDados();
+                    atualizarResumo();
+                } else {
+                    alert("Senha incorreta!");
+                }
             });
-        }
 
-        // Sistema de Login
-        document.getElementById('login-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const senha = document.getElementById('password').value;
-            
-            if (senha === SENHA_CORRETA) {
-                loginScreen.classList.add('hidden');
-                app.classList.remove('hidden');
-                carregarDados();
-                verificarNotificacoes();
-            } else {
-                alert("Senha incorreta!");
-            }
+            // Controle de edição da obra
+            document.getElementById('edit-obra-btn').addEventListener('click', () => {
+                document.getElementById('display-obra-data').classList.toggle('hidden');
+                document.getElementById('edit-obra-form').classList.toggle('hidden');
+                
+                // Preenche formulário se estiver editando
+                if (!document.getElementById('edit-obra-form').classList.contains('hidden')) {
+                    document.getElementById('input-obra-nome').value = userData.obra.nome;
+                    document.getElementById('input-obra-valor').value = userData.obra.valor;
+                    document.getElementById('input-obra-metro').value = userData.obra.metroQuadrado;
+                }
+            });
+
+            // Salvar dados da obra
+            document.getElementById('edit-obra-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                userData.obra = {
+                    nome: document.getElementById('input-obra-nome').value,
+                    valor: parseFloat(document.getElementById('input-obra-valor').value) || 0,
+                    metroQuadrado: parseFloat(document.getElementById('input-obra-metro').value) || 0
+                };
+                salvarDados();
+                document.getElementById('edit-obra-form').classList.add('hidden');
+                document.getElementById('display-obra-data').classList.remove('hidden');
+                atualizarInterface();
+            });
+
+            // Adicionar vale
+            document.getElementById('add-adiantamento-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const form = e.target;
+                userData.vales.push({
+                    id: Date.now(),
+                    data: form.data.value,
+                    descricao: form.descricao.value,
+                    valor: parseFloat(form.valor.value) || 0
+                });
+                form.reset();
+                salvarDados();
+                atualizarInterface();
+            });
+
+            // Backup (simplificado)
+            document.getElementById('backup-btn').addEventListener('click', () => {
+                localStorage.setItem(DADOS_LOCAIS, JSON.stringify(userData));
+                document.getElementById('backup-status').textContent = "Backup local realizado em " + new Date().toLocaleString();
+            });
+
+            // Restauração (simplificada)
+            document.getElementById('restore-btn').addEventListener('click', () => {
+                const dados = localStorage.getItem(DADOS_LOCAIS);
+                if (dados) {
+                    userData = JSON.parse(dados);
+                    atualizarInterface();
+                    document.getElementById('backup-status').textContent = "Dados restaurados com sucesso!";
+                } else {
+                    document.getElementById('backup-status').textContent = "Nenhum backup encontrado";
+                }
+            });
         });
 
-        // Carrega dados locais
+        // Funções auxiliares
         function carregarDados() {
             const dados = localStorage.getItem(DADOS_LOCAIS);
             if (dados) {
-                console.log("Dados carregados:", JSON.parse(dados));
-                backupStatus.textContent = "Dados locais carregados com sucesso";
+                userData = JSON.parse(dados);
             }
+            atualizarInterface();
         }
 
-        // Sistema de Backup Online
-        backupBtn.addEventListener('click', async () => {
-            backupStatus.textContent = "Iniciando backup...";
-            try {
-                await inicializarFirebase();
-                const userId = localStorage.getItem(BACKUP_KEY) || 'user_' + Math.random().toString(36).substr(2, 9);
-                const dados = localStorage.getItem(DADOS_LOCAIS) || '{}';
-                
-                await firebase.database().ref('users/' + userId).set({
-                    dados: dados,
-                    ultimaAtualizacao: new Date().toISOString()
+        function salvarDados() {
+            localStorage.setItem(DADOS_LOCAIS, JSON.stringify(userData));
+        }
+
+        function atualizarInterface() {
+            // Atualiza dados da obra
+            document.getElementById('display-obra-nome').textContent = userData.obra.nome || "N/A";
+            document.getElementById('display-obra-valor').textContent = formatCurrency(userData.obra.valor);
+            document.getElementById('display-obra-metro').textContent = userData.obra.metroQuadrado ? `${userData.obra.metroQuadrado} m²` : "N/A";
+
+            // Atualiza lista de vales
+            const listaVales = document.getElementById('adiantamentos-list');
+            listaVales.innerHTML = userData.vales.length > 0 
+                ? userData.vales.map(vale => `
+                    <li class="py-4 flex justify-between items-center">
+                        <div>
+                            <p class="font-medium">${vale.descricao}</p>
+                            <p class="text-sm text-gray-500">${formatDate(vale.data)}</p>
+                        </div>
+                        <div class="flex items-center">
+                            <span class="font-semibold mr-2">${formatCurrency(vale.valor)}</span>
+                            <button class="text-red-500 p-1" data-id="${vale.id}">
+                                ✕
+                            </button>
+                        </div>
+                    </li>
+                `).join('')
+                : '<li class="py-4 text-center text-gray-500">Nenhum vale registrado</li>';
+
+            // Adiciona eventos de remoção
+            document.querySelectorAll('#adiantamentos-list button').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const id = parseInt(e.target.closest('button').dataset.id);
+                    userData.vales = userData.vales.filter(v => v.id !== id);
+                    salvarDados();
+                    atualizarInterface();
                 });
-                
-                localStorage.setItem(BACKUP_KEY, userId);
-                backupStatus.textContent = `Backup realizado! Seu ID: ${userId}`;
-            } catch (error) {
-                backupStatus.textContent = "Erro no backup: " + error.message;
-            }
-        });
+            });
 
-        // Restauração de Backup
-        restoreBtn.addEventListener('click', async () => {
-            const userId = prompt("Digite seu ID de backup:");
-            if (userId) {
-                backupStatus.textContent = "Restaurando dados...";
-                try {
-                    await inicializarFirebase();
-                    const snapshot = await firebase.database().ref('users/' + userId).once('value');
-                    const data = snapshot.val();
-                    
-                    if (data && data.dados) {
-                        localStorage.setItem(DADOS_LOCAIS, data.dados);
-                        localStorage.setItem(BACKUP_KEY, userId);
-                        backupStatus.textContent = "Dados restaurados com sucesso!";
-                        location.reload();
-                    } else {
-                        backupStatus.textContent = "Nenhum dado encontrado para este ID";
-                    }
-                } catch (error) {
-                    backupStatus.textContent = "Erro na restauração: " + error.message;
-                }
-            }
-        });
-
-        // Upload de Fotos
-        uploadBtn.addEventListener('click', () => {
-            fotoInput.click();
-        });
-
-        fotoInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    fotoObra.src = event.target.result;
-                    fotoObra.classList.remove('hidden');
-                    // Aqui você pode implementar o upload para o Firebase Storage
-                };
-                reader.readAsDataURL(file);
-            }
-        });
-
-        // Sistema de Notificações
-        function verificarNotificacoes() {
-            if (Notification.permission !== "granted") {
-                Notification.requestPermission();
-            }
-            
-            // Verificação periódica do saldo
-            setInterval(() => {
-                if (notificacoesAtiva.checked) {
-                    const saldo = calcularSaldo(); // Implemente esta função
-                    const limite = parseFloat(valorAlerta.value) || 1000;
-                    
-                    if (saldo < limite) {
-                        mostrarNotificacao(`Atenção: Saldo abaixo de R$ ${limite.toFixed(2)}`);
-                    }
-                }
-            }, 3600000); // Verifica a cada hora
+            atualizarResumo();
         }
 
-        function mostrarNotificacao(mensagem) {
-            if (Notification.permission === "granted") {
-                new Notification(mensagem);
-            } else if (document.hidden) {
-                alert(mensagem); // Fallback se notificações não permitidas
-            }
+        function atualizarResumo() {
+            const totalVales = userData.vales.reduce((sum, vale) => sum + vale.valor, 0);
+            const saldo = userData.obra.valor - totalVales;
+
+            document.getElementById('total-obra').textContent = formatCurrency(userData.obra.valor);
+            document.getElementById('total-vales').textContent = formatCurrency(totalVales);
+            document.getElementById('saldo').textContent = formatCurrency(saldo);
+            document.getElementById('saldo').className = saldo < 0 
+                ? "text-lg font-bold text-red-600" 
+                : "text-lg font-bold text-green-600";
         }
 
-        // Inicialização
-        if (localStorage.getItem(DADOS_LOCAIS)) {
-            loginScreen.classList.add('hidden');
-            app.classList.remove('hidden');
-            carregarDados();
-            verificarNotificacoes();
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('pt-BR', { 
+                style: 'currency', 
+                currency: 'BRL' 
+            }).format(value || 0);
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return "N/A";
+            const date = new Date(dateString);
+            return date.toLocaleDateString('pt-BR');
         }
     </script>
 </body>
