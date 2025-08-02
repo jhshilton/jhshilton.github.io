@@ -12,7 +12,6 @@
             width: 100%; padding: 10px; border: 1px solid #d1d5db;
             border-radius: 0.5rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
-        #foto-obra { max-width: 100%; height: auto; border-radius: 0.5rem; }
     </style>
 </head>
 <body class="bg-gray-100 p-4">
@@ -37,7 +36,7 @@
         <!-- Cabeçalho -->
         <header class="text-center mt-8 mb-6">
             <h1 class="text-3xl font-bold text-gray-900">Gerenciador de Obras</h1>
-            <p class="text-gray-600 mt-2">Controle financeiro completo</p>
+            <p class="text-gray-600 mt-2">Controle completo de obras e vales</p>
         </header>
 
         <!-- Seção de Detalhes da Obra -->
@@ -79,7 +78,7 @@
                     <label class="text-sm font-medium mb-1">Metros Quadrados (m²):</label>
                     <input id="input-obra-metro" type="number" class="input-field">
                 </div>
-                <button type="submit" class="w-full bg-blue-500 text-white py-2 rounded-lg">
+                <button type="submit" class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition-colors">
                     Salvar
                 </button>
             </form>
@@ -115,20 +114,6 @@
             </div>
         </div>
 
-        <!-- Seção de Backup -->
-        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-            <h2 class="text-xl font-semibold mb-4">Backup Online</h2>
-            <div class="flex space-x-4">
-                <button id="backup-btn" class="bg-green-500 text-white px-4 py-2 rounded-lg">
-                    Fazer Backup
-                </button>
-                <button id="restore-btn" class="bg-blue-500 text-white px-4 py-2 rounded-lg">
-                    Restaurar
-                </button>
-            </div>
-            <p id="backup-status" class="text-sm text-gray-500 mt-2"></p>
-        </div>
-
         <!-- Resumo Financeiro -->
         <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
             <h2 class="text-xl font-semibold mb-4">Resumo Financeiro</h2>
@@ -146,6 +131,20 @@
                     <p id="saldo" class="text-lg font-bold">R$ 0,00</p>
                 </div>
             </div>
+        </div>
+
+        <!-- Backup Simples -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-xl font-semibold mb-4">Backup Local</h2>
+            <div class="flex space-x-4">
+                <button id="backup-btn" class="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transition-colors">
+                    Fazer Backup
+                </button>
+                <button id="restore-btn" class="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition-colors">
+                    Restaurar
+                </button>
+            </div>
+            <p id="backup-status" class="text-sm text-gray-500 mt-2"></p>
         </div>
     </div>
 
@@ -173,7 +172,6 @@
                     document.getElementById('login-screen').classList.add('hidden');
                     document.getElementById('app').classList.remove('hidden');
                     carregarDados();
-                    atualizarResumo();
                 } else {
                     alert("Senha incorreta!");
                 }
@@ -221,13 +219,13 @@
                 atualizarInterface();
             });
 
-            // Backup (simplificado)
+            // Backup
             document.getElementById('backup-btn').addEventListener('click', () => {
                 localStorage.setItem(DADOS_LOCAIS, JSON.stringify(userData));
-                document.getElementById('backup-status').textContent = "Backup local realizado em " + new Date().toLocaleString();
+                document.getElementById('backup-status').textContent = "Backup realizado em " + new Date().toLocaleString();
             });
 
-            // Restauração (simplificada)
+            // Restauração
             document.getElementById('restore-btn').addEventListener('click', () => {
                 const dados = localStorage.getItem(DADOS_LOCAIS);
                 if (dados) {
