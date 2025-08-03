@@ -66,7 +66,7 @@
             <div class="w-full md:w-1/3 bg-white p-4 rounded-lg shadow">
                 <h2 class="text-xl font-semibold mb-4">Suas Obras</h2>
                 <div id="obras-list" class="space-y-2 min-h-[200px]">
-                    <div class="text-center py-4 text-gray-500">Carregando obras...</div>
+                    <div class="text-center py-4 text-gray-500">Nenhuma obra cadastrada</div>
                 </div>
             </div>
 
@@ -191,23 +191,35 @@
 
         // 4. Inicialização
         document.addEventListener('DOMContentLoaded', () => {
-            // Login
+            // Configura primeiro os event listeners
+            configurarEventListeners();
+            
+            // Configura o login
             document.getElementById('login-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const senha = document.getElementById('password').value;
                 if (senha === SENHA_CORRETA) {
-                    mostrarLoading(true, "Conectando...");
+                    mostrarLoading(true, "Iniciando...");
                     document.getElementById('login-screen').classList.add('hidden');
                     document.getElementById('app').classList.remove('hidden');
                     
                     try {
-                        await carregarDadosIniciais();
+                        // Verifica se há dados
+                        const hasData = await verificarDadosExistentes();
+                        
+                        if (!hasData) {
+                            mostrarMensagem("Pronto para começar!");
+                            userData = { obras: [], obraSelecionada: null };
+                        } else {
+                            await carregarDadosIniciais();
+                            mostrarMensagem("Dados carregados");
+                        }
+                        
                         atualizarInterface();
                         configurarSincronizacaoTempoReal();
-                        mostrarMensagem("Conectado com sucesso");
                     } catch (error) {
-                        console.error("Erro ao carregar dados:", error);
-                        mostrarMensagem("Erro ao conectar. Usando dados locais.", true);
+                        console.error("Erro:", error);
+                        mostrarMensagem("Usando dados locais", true);
                         carregarDadosLocais();
                     } finally {
                         mostrarLoading(false);
@@ -216,21 +228,29 @@
                     alert("Senha incorreta!");
                 }
             });
-
-            // Configura todos os event listeners
-            configurarEventListeners();
         });
 
         // 5. Funções de Carregamento de Dados
+        async function verificarDadosExistentes() {
+            return new Promise((resolve) => {
+                const ref = database.ref('obras/' + btoa(SENHA_CORRETA));
+                
+                ref.once('value').then(snapshot => {
+                    resolve(snapshot.exists());
+                }).catch(() => {
+                    resolve(false);
+                });
+            });
+        }
+
         async function carregarDadosIniciais() {
             return new Promise((resolve, reject) => {
                 const ref = database.ref('obras/' + btoa(SENHA_CORRETA));
                 
-                // Timeout para evitar travamento
                 const timeout = setTimeout(() => {
                     ref.off();
                     reject(new Error("Timeout ao conectar ao servidor"));
-                }, 8000); // 8 segundos
+                }, 8000);
 
                 ref.once('value').then(snapshot => {
                     clearTimeout(timeout);
@@ -241,7 +261,6 @@
                         localStorage.setItem('obras_backup', JSON.stringify(userData));
                         resolve();
                     } else {
-                        // Se não há dados, cria estrutura inicial
                         userData = { obras: [], obraSelecionada: null };
                         salvarDados().then(resolve).catch(reject);
                     }
@@ -279,6 +298,8 @@
         // 6. Funções para Salvar Dados
         async function salvarDados() {
             return new Promise((resolve, reject) => {
+                mostrarMensagem("Salvando dados...");
+                
                 database.ref('obras/' + btoa(SENHA_CORRETA)).set(userData)
                     .then(() => {
                         localStorage.setItem('obras_backup', JSON.stringify(userData));
@@ -474,7 +495,10 @@
         function configurarEventListeners() {
             // Nova Obra
             document.getElementById('nova-obra-btn').addEventListener('click', () => {
+                if (!document.getElementById('modal-nova-obra').classList.contains('hidden')) return;
+                
                 document.getElementById('modal-nova-obra').classList.remove('hidden');
+                document.getElementById('obra-nome').focus();
             });
 
             document.getElementById('cancelar-obra').addEventListener('click', () => {
