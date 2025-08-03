@@ -1,476 +1,338 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerenciador de Obras Hilton</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Firebase para armazenamento em nuvem -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    <style>
-        body { font-family: 'Arial', sans-serif; }
-        .obra-card { transition: all 0.3s; }
-        .obra-card:hover { transform: translateY(-2px); }
-        .active-obra { border-left: 4px solid #3B82F6; }
-    </style>
-</head>
-<body class="bg-gray-100 min-h-screen">
-    <!-- Tela de Login -->
-    <div id="login-screen" class="flex items-center justify-center h-screen">
-        <div class="bg-white p-8 rounded-lg shadow-md w-96">
-            <h1 class="text-2xl font-bold text-center mb-6">Controle de Obras</h1>
-            <form id="login-form" class="space-y-4">
-                <div>
-                    <label class="block mb-2">Senha de Acesso:</label>
-                    <input type="password" id="password" class="w-full p-2 border rounded" required>
-                </div>
-                <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
-                    Acessar Sistema
-                </button>
-            </form>
-        </div>
-    </div>
+import React, { useState, useEffect } from 'react';
+import { initializeApp } from 'firebase/app';
+import {
+    getAuth,
+    signInWithCustomToken,
+    onAuthStateChanged,
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    signOut
+} from 'firebase/auth';
+import {
+    getFirestore,
+    collection,
+    addDoc,
+    onSnapshot,
+    query,
+    where,
+    doc,
+    deleteDoc
+} from 'firebase/firestore';
 
-    <!-- Aplicativo Principal -->
-    <div id="app" class="hidden container mx-auto p-4">
-        <!-- Cabeçalho -->
-        <header class="flex justify-between items-center mb-6">
-            <h1 class="text-2xl font-bold">Controle Financeiro de Obras</h1>
-            <button id="nova-obra-btn" class="bg-green-600 text-white px-4 py-2 rounded">
-                + Nova Obra
-            </button>
-        </header>
+// Variáveis de configuração do ambiente, por favor não altere
+const firebaseConfig = typeof _firebase_config !== 'undefined' ? JSON.parse(_firebase_config) : {};
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-        <!-- Corpo do Aplicativo -->
-        <div class="flex flex-col md:flex-row gap-6">
-            <!-- Lista de Obras -->
-            <div class="w-full md:w-1/3 bg-white p-4 rounded-lg shadow">
-                <h2 class="text-xl font-semibold mb-4">Suas Obras</h2>
-                <div id="obras-list" class="space-y-2">
-                    <!-- Obras serão carregadas aqui -->
-                    <div class="text-center py-4 text-gray-500">Nenhuma obra cadastrada</div>
-                </div>
-            </div>
+// Inicializa o Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
-            <!-- Detalhes da Obra -->
-            <div class="w-full md:w-2/3 bg-white p-4 rounded-lg shadow">
-                <div id="obra-details">
-                    <div class="text-center py-8 text-gray-500">
-                        Selecione uma obra ou crie uma nova para começar
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+// Use lucide-react para ícones modernos
+import { LogOut, UserPlus, LogIn, Save, Trash2, Loader } from 'lucide-react';
 
-    <!-- Modal Nova Obra -->
-    <div id="modal-nova-obra" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4">
-        <div class="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 class="text-xl font-bold mb-4">Cadastrar Nova Obra</h2>
-            <form id="form-nova-obra">
-                <div class="mb-4">
-                    <label class="block mb-2">Nome da Obra:</label>
-                    <input type="text" id="obra-nome" class="w-full p-2 border rounded" required>
-                </div>
-                <div class="mb-4">
-                    <label class="block mb-2">Valor Inicial (R$):</label>
-                    <input type="number" id="obra-valor" class="w-full p-2 border rounded" required>
-                </div>
-                <div class="flex justify-end space-x-2">
-                    <button type="button" id="cancelar-obra" class="px-4 py-2 border rounded">
-                        Cancelar
-                    </button>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">
-                        Salvar Obra
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
+const App = () => {
+    // Estados para gerenciar a autenticação e dados
+    const [user, setUser] = useState(null);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [dataText, setDataText] = useState('');
+    const [userData, setUserData] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [isLoginMode, setIsLoginMode] = useState(true);
 
-    <!-- Modal Novo Serviço -->
-    <div id="modal-novo-servico" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4">
-        <div class="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 class="text-xl font-bold mb-4">Adicionar Serviço/Receita</h2>
-            <form id="form-novo-servico">
-                <div class="mb-4">
-                    <label class="block mb-2">Descrição:</label>
-                    <input type="text" id="servico-descricao" class="w-full p-2 border rounded" required>
-                </div>
-                <div class="mb-4">
-                    <label class="block mb-2">Valor (R$):</label>
-                    <input type="number" id="servico-valor" class="w-full p-2 border rounded" required>
-                </div>
-                <div class="mb-4">
-                    <label class="block mb-2">Data:</label>
-                    <input type="date" id="servico-data" class="w-full p-2 border rounded" required>
-                </div>
-                <div class="flex justify-end space-x-2">
-                    <button type="button" id="cancelar-servico" class="px-4 py-2 border rounded">
-                        Cancelar
-                    </button>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">
-                        Adicionar
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal Novo Vale -->
-    <div id="modal-novo-vale" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4">
-        <div class="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 class="text-xl font-bold mb-4">Registrar Vale</h2>
-            <form id="form-novo-vale">
-                <div class="mb-4">
-                    <label class="block mb-2">Descrição:</label>
-                    <input type="text" id="vale-descricao" class="w-full p-2 border rounded" required>
-                </div>
-                <div class="mb-4">
-                    <label class="block mb-2">Valor (R$):</label>
-                    <input type="number" id="vale-valor" class="w-full p-2 border rounded" required>
-                </div>
-                <div class="mb-4">
-                    <label class="block mb-2">Data:</label>
-                    <input type="date" id="vale-data" class="w-full p-2 border rounded" required>
-                </div>
-                <div class="flex justify-end space-x-2">
-                    <button type="button" id="cancelar-vale" class="px-4 py-2 border rounded">
-                        Cancelar
-                    </button>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">
-                        Registrar
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <script>
-        // Configuração do Firebase (substitua com suas credenciais)
-        const firebaseConfig = {
-            apiKey: "SUA_API_KEY",
-            authDomain: "SEU_PROJETO.firebaseapp.com",
-            databaseURL: "https://SEU_PROJETO.firebaseio.com",
-            projectId: "SEU_PROJETO",
-            storageBucket: "SEU_PROJETO.appspot.com",
-            messagingSenderId: "SEU_SENDER_ID",
-            appId: "SEU_APP_ID"
-        };
-
-        // Inicializa Firebase
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
-
-        // Configurações
-        const SENHA_CORRETA = "Leticia180977";
-        const DADOS_LOCAIS = "hilton_obras_data";
-        
-        // Estado do aplicativo
-        let userData = {
-            obras: [],
-            obraSelecionada: null
-        };
-
-        // Inicialização
-        document.addEventListener('DOMContentLoaded', () => {
-            // Login
-            document.getElementById('login-form').addEventListener('submit', (e) => {
-                e.preventDefault();
-                const senha = document.getElementById('password').value;
-                if (senha === SENHA_CORRETA) {
-                    document.getElementById('login-screen').classList.add('hidden');
-                    document.getElementById('app').classList.remove('hidden');
-                    carregarDados();
-                } else {
-                    alert("Senha incorreta!");
-                }
-            });
-
-            // Nova Obra
-            document.getElementById('nova-obra-btn').addEventListener('click', () => {
-                document.getElementById('modal-nova-obra').classList.remove('hidden');
-            });
-
-            document.getElementById('cancelar-obra').addEventListener('click', () => {
-                document.getElementById('modal-nova-obra').classList.add('hidden');
-                document.getElementById('form-nova-obra').reset();
-            });
-
-            document.getElementById('form-nova-obra').addEventListener('submit', (e) => {
-                e.preventDefault();
-                const novaObra = {
-                    id: Date.now().toString(),
-                    nome: document.getElementById('obra-nome').value,
-                    valorInicial: parseFloat(document.getElementById('obra-valor').value) || 0,
-                    servicos: [],
-                    vales: [],
-                    dataCriacao: new Date().toISOString(),
-                    status: 'andamento' // 'andamento' ou 'concluida'
-                };
-                
-                userData.obras.push(novaObra);
-                userData.obraSelecionada = novaObra.id;
-                
-                salvarDados();
-                document.getElementById('modal-nova-obra').classList.add('hidden');
-                document.getElementById('form-nova-obra').reset();
-                atualizarInterface();
-            });
-
-            // Novo Serviço
-            document.getElementById('cancelar-servico').addEventListener('click', () => {
-                document.getElementById('modal-novo-servico').classList.add('hidden');
-                document.getElementById('form-novo-servico').reset();
-            });
-
-            document.getElementById('form-novo-servico').addEventListener('submit', (e) => {
-                e.preventDefault();
-                const obra = userData.obras.find(o => o.id === userData.obraSelecionada);
-                if (obra) {
-                    obra.servicos.push({
-                        id: Date.now().toString(),
-                        descricao: document.getElementById('servico-descricao').value,
-                        valor: parseFloat(document.getElementById('servico-valor').value) || 0,
-                        data: document.getElementById('servico-data').value
-                    });
-                    
-                    salvarDados();
-                    document.getElementById('modal-novo-servico').classList.add('hidden');
-                    document.getElementById('form-novo-servico').reset();
-                    atualizarInterface();
-                }
-            });
-
-            // Novo Vale
-            document.getElementById('cancelar-vale').addEventListener('click', () => {
-                document.getElementById('modal-novo-vale').classList.add('hidden');
-                document.getElementById('form-novo-vale').reset();
-            });
-
-            document.getElementById('form-novo-vale').addEventListener('submit', (e) => {
-                e.preventDefault();
-                const obra = userData.obras.find(o => o.id === userData.obraSelecionada);
-                if (obra) {
-                    obra.vales.push({
-                        id: Date.now().toString(),
-                        descricao: document.getElementById('vale-descricao').value,
-                        valor: parseFloat(document.getElementById('vale-valor').value) || 0,
-                        data: document.getElementById('vale-data').value
-                    });
-                    
-                    salvarDados();
-                    document.getElementById('modal-novo-vale').classList.add('hidden');
-                    document.getElementById('form-novo-vale').reset();
-                    atualizarInterface();
-                }
-            });
+    // Efeito para inicializar a autenticação e o listener do Firestore
+    useEffect(() => {
+        const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
+            if (currentUser) {
+                setUser(currentUser);
+            } else {
+                setUser(null);
+            }
+            setIsLoading(false);
         });
 
-        // Funções do sistema
-        function carregarDados() {
-            // Tenta carregar da nuvem primeiro
-            database.ref('obras/' + btoa(SENHA_CORRETA)).once('value')
-                .then(snapshot => {
-                    const dados = snapshot.val();
-                    if (dados) {
-                        userData = dados;
-                        atualizarInterface();
-                    } else {
-                        // Se não tiver na nuvem, tenta local
-                        const dadosLocais = localStorage.getItem(DADOS_LOCAIS);
-                        if (dadosLocais) {
-                            userData = JSON.parse(dadosLocais);
-                            atualizarInterface();
-                        }
-                    }
-                })
-                .catch(error => {
-                    console.error("Erro ao carregar da nuvem:", error);
-                    // Fallback para localStorage
-                    const dadosLocais = localStorage.getItem(DADOS_LOCAIS);
-                    if (dadosLocais) {
-                        userData = JSON.parse(dadosLocais);
-                        atualizarInterface();
-                    }
-                });
-        }
-
-        function salvarDados() {
-            // Salva localmente
-            localStorage.setItem(DADOS_LOCAIS, JSON.stringify(userData));
-            
-            // Salva na nuvem
-            database.ref('obras/' + btoa(SENHA_CORRETA)).set(userData)
-                .catch(error => {
-                    console.error("Erro ao salvar na nuvem:", error);
-                });
-        }
-
-        function atualizarInterface() {
-            atualizarListaObras();
-            atualizarDetalhesObra();
-        }
-
-        function atualizarListaObras() {
-            const obrasList = document.getElementById('obras-list');
-            
-            if (userData.obras.length === 0) {
-                obrasList.innerHTML = '<div class="text-center py-4 text-gray-500">Nenhuma obra cadastrada</div>';
-                return;
+        // Se o token de autenticação inicial existir, faz o login personalizado
+        const signInWithToken = async () => {
+            if (initialAuthToken) {
+                try {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } catch (e) {
+                    console.error("Erro ao fazer login com token personalizado:", e);
+                }
             }
-            
-            obrasList.innerHTML = userData.obras.map(obra => `
-                <div class="obra-card p-3 border rounded cursor-pointer ${userData.obraSelecionada === obra.id ? 'bg-blue-50 active-obra' : 'bg-white'}" 
-                     data-id="${obra.id}">
-                    <div class="flex justify-between items-center">
-                        <h3 class="font-medium">${obra.nome}</h3>
-                        <span class="text-xs px-2 py-1 rounded ${obra.status === 'concluida' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
-                            ${obra.status === 'concluida' ? 'Concluída' : 'Em andamento'}
-                        </span>
-                    </div>
-                    <p class="text-sm text-gray-600 mt-1">Criada em: ${formatDate(obra.dataCriacao)}</p>
-                </div>
-            `).join('');
-            
-            // Adiciona eventos de clique
-            document.querySelectorAll('.obra-card').forEach(card => {
-                card.addEventListener('click', (e) => {
-                    userData.obraSelecionada = e.currentTarget.dataset.id;
-                    salvarDados();
-                    atualizarInterface();
-                });
+        };
+        signInWithToken();
+
+        return () => unsubscribeAuth();
+    }, []);
+
+    // Efeito para buscar dados do usuário em tempo real
+    useEffect(() => {
+        if (!user) {
+            setUserData([]);
+            return;
+        }
+
+        const userId = user.uid;
+        // Caminho da coleção privada do usuário
+        const userRef = collection(db, 'artifacts', appId, 'users', userId, 'userData');
+        const q = query(userRef);
+
+        // Listener em tempo real para a coleção de dados do usuário
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setUserData(items);
+        }, (e) => {
+            console.error("Erro ao carregar dados do usuário:", e);
+            setError("Não foi possível carregar os dados.");
+        });
+
+        return () => unsubscribe();
+    }, [user]);
+
+    // Lida com o cadastro de um novo usuário
+    const handleSignUp = async (e) => {
+        e.preventDefault();
+        setError(null);
+        try {
+            await createUserWithEmailAndPassword(auth, email, password);
+        } catch (e) {
+            console.error("Erro ao cadastrar:", e.message);
+            if (e.code === 'auth/email-already-in-use') {
+                setError("O e-mail já está em uso. Tente fazer login.");
+            } else if (e.code === 'auth/weak-password') {
+                setError("A senha é muito fraca. Use pelo menos 6 caracteres.");
+            } else if (e.code === 'auth/invalid-email') {
+                setError("O e-mail é inválido.");
+            } else {
+                setError("Erro no cadastro. Tente novamente.");
+            }
+        }
+    };
+
+    // Lida com o login de um usuário existente
+    const handleSignIn = async (e) => {
+        e.preventDefault();
+        setError(null);
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
+        } catch (e) {
+            console.error("Erro ao fazer login:", e.message);
+            if (e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found') {
+                setError("E-mail ou senha incorretos.");
+            } else {
+                setError("Erro no login. Tente novamente.");
+            }
+        }
+    };
+
+    // Lida com o logout do usuário
+    const handleSignOut = async () => {
+        setError(null);
+        try {
+            await signOut(auth);
+        } catch (e) {
+            console.error("Erro ao sair:", e.message);
+            setError("Erro ao sair. Tente novamente.");
+        }
+    };
+
+    // Salva um novo item no Firestore
+    const saveData = async () => {
+        if (!dataText.trim()) return;
+        if (!user) {
+            setError("Você precisa estar logado para salvar dados.");
+            return;
+        }
+
+        try {
+            const userId = user.uid;
+            const userRef = collection(db, 'artifacts', appId, 'users', userId, 'userData');
+            await addDoc(userRef, {
+                text: dataText,
+                createdAt: new Date()
             });
+            setDataText('');
+        } catch (e) {
+            console.error("Erro ao salvar dados:", e.message);
+            setError("Não foi possível salvar os dados. Tente novamente.");
         }
+    };
 
-        function atualizarDetalhesObra() {
-            const obraDetails = document.getElementById('obra-details');
-            
-            if (!userData.obraSelecionada || userData.obras.length === 0) {
-                obraDetails.innerHTML = '<div class="text-center py-8 text-gray-500">Selecione uma obra ou crie uma nova para começar</div>';
-                return;
-            }
-            
-            const obra = userData.obras.find(o => o.id === userData.obraSelecionada);
-            if (!obra) return;
-            
-            // Calcula totais
-            const totalServicos = obra.servicos.reduce((sum, s) => sum + s.valor, 0);
-            const totalVales = obra.vales.reduce((sum, v) => sum + v.valor, 0);
-            const valorTotal = obra.valorInicial + totalServicos;
-            const saldo = valorTotal - totalVales;
-            
-            obraDetails.innerHTML = `
-                <div class="mb-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-xl font-bold">${obra.nome}</h2>
-                        <div class="flex space-x-2">
-                            <button id="concluir-obra-btn" class="px-3 py-1 text-sm ${obra.status === 'concluida' ? 'bg-gray-200' : 'bg-green-600 text-white'} rounded">
-                                ${obra.status === 'concluida' ? 'Obra Concluída' : 'Marcar como Concluída'}
-                            </button>
-                            <button id="novo-servico-btn" class="px-3 py-1 bg-blue-600 text-white text-sm rounded">
-                                + Serviço
-                            </button>
-                            <button id="novo-vale-btn" class="px-3 py-1 bg-blue-600 text-white text-sm rounded">
-                                + Vale
-                            </button>
-                        </div>
+    // Deleta um item do Firestore
+    const deleteData = async (id) => {
+        if (!user) {
+            setError("Você precisa estar logado para deletar dados.");
+            return;
+        }
+        try {
+            const userId = user.uid;
+            const docRef = doc(db, 'artifacts', appId, 'users', userId, 'userData', id);
+            await deleteDoc(docRef);
+        } catch (e) {
+            console.error("Erro ao deletar dados:", e.message);
+            setError("Não foi possível deletar o item.");
+        }
+    };
+    
+    // UI de carregamento
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-gray-900">
+                <div className="flex items-center text-white text-2xl animate-pulse">
+                    <Loader className="animate-spin mr-3" />
+                    Carregando...
+                </div>
+            </div>
+        );
+    }
+    
+    return (
+        <div className="bg-gray-900 text-white min-h-screen font-sans flex items-center justify-center p-4">
+            <div className="bg-gray-800 p-8 rounded-2xl shadow-2xl w-full max-w-xl">
+                {/* Cabeçalho */}
+                <h1 className="text-4xl font-bold text-center text-purple-400 mb-6">
+                    Meu Aplicativo Pessoal
+                </h1>
+                
+                {/* Exibição do user ID para depuração */}
+                {user && (
+                    <div className="mb-4 p-3 bg-gray-700 rounded-lg text-sm break-all">
+                        <p className="font-semibold text-gray-400">ID do Usuário:</p>
+                        <p>{user.uid}</p>
                     </div>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                        <div class="bg-gray-50 p-3 rounded">
-                            <p class="text-sm text-gray-600">Valor Inicial</p>
-                            <p class="font-bold">${formatCurrency(obra.valorInicial)}</p>
-                        </div>
-                        <div class="bg-gray-50 p-3 rounded">
-                            <p class="text-sm text-gray-600">Serviços Adicionais</p>
-                            <p class="font-bold">${formatCurrency(totalServicos)}</p>
-                        </div>
-                        <div class="bg-gray-50 p-3 rounded">
-                            <p class="text-sm text-gray-600">Total Vales</p>
-                            <p class="font-bold">${formatCurrency(totalVales)}</p>
-                        </div>
-                        <div class="bg-gray-50 p-3 rounded">
-                            <p class="text-sm text-gray-600">Saldo Disponível</p>
-                            <p class="font-bold ${saldo < 0 ? 'text-red-600' : 'text-green-600'}">${formatCurrency(saldo)}</p>
-                        </div>
+                )}
+                
+                {/* Exibe erros se houver */}
+                {error && (
+                    <div className="bg-red-500 text-white p-3 rounded-lg mb-4 text-center">
+                        {error}
                     </div>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <h3 class="font-semibold mb-2">Serviços Adicionais</h3>
-                            ${obra.servicos.length > 0 ? `
-                                <div class="border rounded divide-y">
-                                    ${obra.servicos.map(servico => `
-                                        <div class="p-3 flex justify-between">
-                                            <div>
-                                                <p>${servico.descricao}</p>
-                                                <p class="text-sm text-gray-500">${formatDate(servico.data)}</p>
-                                            </div>
-                                            <div class="font-medium">${formatCurrency(servico.valor)}</div>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            ` : '<p class="text-gray-500 text-center py-4">Nenhum serviço adicional registrado</p>'}
+                )}
+                
+                {/* Conteúdo condicional (Login/Cadastro vs. Dashboard) */}
+                {!user ? (
+                    // Formulário de Login/Cadastro
+                    <div>
+                        <div className="flex justify-center mb-6">
+                            <button
+                                onClick={() => setIsLoginMode(true)}
+                                className={px-6 py-2 rounded-l-full text-lg font-semibold transition-colors duration-300 ${isLoginMode ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}}
+                            >
+                                Login
+                            </button>
+                            <button
+                                onClick={() => setIsLoginMode(false)}
+                                className={px-6 py-2 rounded-r-full text-lg font-semibold transition-colors duration-300 ${!isLoginMode ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}}
+                            >
+                                Cadastrar
+                            </button>
                         </div>
                         
-                        <div>
-                            <h3 class="font-semibold mb-2">Histórico de Vales</h3>
-                            ${obra.vales.length > 0 ? `
-                                <div class="border rounded divide-y">
-                                    ${obra.vales.map(vale => `
-                                        <div class="p-3 flex justify-between">
-                                            <div>
-                                                <p>${vale.descricao}</p>
-                                                <p class="text-sm text-gray-500">${formatDate(vale.data)}</p>
-                                            </div>
-                                            <div class="font-medium">${formatCurrency(vale.valor)}</div>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            ` : '<p class="text-gray-500 text-center py-4">Nenhum vale registrado</p>'}
+                        <form onSubmit={isLoginMode ? handleSignIn : handleSignUp} className="space-y-4">
+                            <div>
+                                <label className="block text-gray-300 mb-1">E-mail</label>
+                                <input
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    placeholder="seu_email@exemplo.com"
+                                    className="w-full p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:border-purple-500 focus:outline-none"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-gray-300 mb-1">Senha</label>
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="Sua senha (mínimo 6 caracteres)"
+                                    className="w-full p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:border-purple-500 focus:outline-none"
+                                    required
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                className="w-full p-3 mt-6 bg-purple-600 text-white font-bold rounded-lg shadow-lg hover:bg-purple-700 transition-colors duration-300 flex items-center justify-center space-x-2"
+                            >
+                                {isLoginMode ? (
+                                    <>
+                                        <LogIn size={20} />
+                                        <span>Entrar</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <UserPlus size={20} />
+                                        <span>Cadastrar</span>
+                                    </>
+                                )}
+                            </button>
+                        </form>
+                    </div>
+                ) : (
+                    // Dashboard do usuário logado
+                    <div>
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="text-2xl font-semibold">Olá, {user.email}!</h2>
+                            <button
+                                onClick={handleSignOut}
+                                className="bg-red-500 text-white p-2 rounded-lg hover:bg-red-600 transition-colors duration-300 flex items-center space-x-2"
+                            >
+                                <LogOut size={20} />
+                                <span>Sair</span>
+                            </button>
+                        </div>
+
+                        {/* Formulário para adicionar novos dados */}
+                        <div className="mb-6">
+                            <label className="block text-gray-300 mb-1">Adicionar novo item:</label>
+                            <div className="flex space-x-2">
+                                <input
+                                    type="text"
+                                    value={dataText}
+                                    onChange={(e) => setDataText(e.target.value)}
+                                    placeholder="Digite algo para salvar..."
+                                    className="flex-grow p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:border-purple-500 focus:outline-none"
+                                />
+                                <button
+                                    onClick={saveData}
+                                    className="p-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-300 flex items-center justify-center"
+                                >
+                                    <Save size={20} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Lista de dados salvos */}
+                        <div className="space-y-3">
+                            <h3 className="text-xl font-bold text-purple-400">Seus Dados Salvos:</h3>
+                            {userData.length === 0 ? (
+                                <p className="text-gray-400 text-center p-4 bg-gray-700 rounded-lg">Nenhum dado salvo ainda.</p>
+                            ) : (
+                                <ul className="space-y-2">
+                                    {userData.map(item => (
+                                        <li key={item.id} className="flex items-center justify-between p-3 bg-gray-700 rounded-lg shadow-md">
+                                            <span className="text-gray-200">{item.text}</span>
+                                            <button
+                                                onClick={() => deleteData(item.id)}
+                                                className="text-red-400 hover:text-red-500 transition-colors duration-300"
+                                            >
+                                                <Trash2 size={20} />
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
                         </div>
                     </div>
-                </div>
-            `;
-            
-            // Adiciona eventos aos botões
-            if (document.getElementById('novo-servico-btn')) {
-                document.getElementById('novo-servico-btn').addEventListener('click', () => {
-                    document.getElementById('modal-novo-servico').classList.remove('hidden');
-                    document.getElementById('servico-data').value = new Date().toISOString().split('T')[0];
-                });
-            }
-            
-            if (document.getElementById('novo-vale-btn')) {
-                document.getElementById('novo-vale-btn').addEventListener('click', () => {
-                    document.getElementById('modal-novo-vale').classList.remove('hidden');
-                    document.getElementById('vale-data').value = new Date().toISOString().split('T')[0];
-                });
-            }
-            
-            if (document.getElementById('concluir-obra-btn') && obra.status !== 'concluida') {
-                document.getElementById('concluir-obra-btn').addEventListener('click', () => {
-                    obra.status = 'concluida';
-                    salvarDados();
-                    atualizarInterface();
-                });
-            }
-        }
+                )}
+            </div>
+        </div>
+    );
+};
 
-        function formatCurrency(value) {
-            return new Intl.NumberFormat('pt-BR', { 
-                style: 'currency', 
-                currency: 'BRL' 
-            }).format(value || 0);
-        }
-
-        function formatDate(dateString) {
-            if (!dateString) return "N/A";
-            const date = new Date(dateString);
-            return date.toLocaleDateString('pt-BR');
-        }
-    </script>
-</body>
-</html>
+export default App;
