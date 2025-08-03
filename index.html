@@ -5,12 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gerenciador de Obras Hilton</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Adicionando Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
         .container { max-width: 640px; margin: 0 auto; }
         .input-field {
             width: 100%; padding: 10px; border: 1px solid #d1d5db;
             border-radius: 0.5rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .tab-button {
+            padding: 8px 16px; border-radius: 8px; margin-right: 8px;
+            cursor: pointer; transition: all 0.3s;
+        }
+        .tab-button.active {
+            background-color: #3B82F6; color: white;
         }
     </style>
 </head>
@@ -39,128 +49,229 @@
             <p class="text-gray-600 mt-2">Controle completo de obras e vales</p>
         </header>
 
-        <!-- Seção de Detalhes da Obra -->
+        <!-- Seletor de Obras -->
         <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
             <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-semibold">Detalhes da Obra</h2>
-                <button id="edit-obra-btn" class="bg-blue-500 text-white rounded-full px-4 py-2 text-sm hover:bg-blue-600 transition-colors">
-                    Editar
+                <h2 class="text-xl font-semibold">Selecionar Obra</h2>
+                <button id="nova-obra-btn" class="bg-green-500 text-white rounded-full px-4 py-2 text-sm hover:bg-green-600 transition-colors">
+                    + Nova Obra
                 </button>
             </div>
             
-            <!-- Modo Visualização -->
-            <div id="display-obra-data" class="space-y-3">
-                <div class="flex items-center space-x-3 text-lg">
-                    <span class="text-blue-500">🏠</span>
-                    <span><strong>Obra:</strong> <span id="display-obra-nome">N/A</span></span>
-                </div>
-                <div class="flex items-center space-x-3 text-lg">
-                    <span class="text-blue-500">💲</span>
-                    <span><strong>Valor:</strong> <span id="display-obra-valor">R$ 0,00</span></span>
-                </div>
-                <div class="flex items-center space-x-3 text-lg">
-                    <span class="text-blue-500">📏</span>
-                    <span><strong>Metragem:</strong> <span id="display-obra-metro">0 m²</span></span>
+            <div class="flex overflow-x-auto py-2">
+                <div id="obras-list" class="flex space-x-2">
+                    <!-- Obras serão carregadas aqui -->
                 </div>
             </div>
+        </div>
 
-            <!-- Modo Edição -->
-            <form id="edit-obra-form" class="hidden space-y-4">
+        <!-- Formulário de Nova Obra (inicialmente oculto) -->
+        <div id="nova-obra-form-container" class="bg-white rounded-xl shadow-lg p-6 mb-6 hidden">
+            <h2 class="text-xl font-semibold mb-4">Cadastrar Nova Obra</h2>
+            <form id="nova-obra-form" class="space-y-4">
                 <div class="flex flex-col">
                     <label class="text-sm font-medium mb-1">Nome da Obra:</label>
-                    <input id="input-obra-nome" type="text" class="input-field">
+                    <input id="nova-obra-nome" type="text" class="input-field" required>
                 </div>
                 <div class="flex flex-col">
                     <label class="text-sm font-medium mb-1">Valor Total (R$):</label>
-                    <input id="input-obra-valor" type="number" class="input-field">
+                    <input id="nova-obra-valor" type="number" class="input-field" required>
                 </div>
                 <div class="flex flex-col">
                     <label class="text-sm font-medium mb-1">Metros Quadrados (m²):</label>
-                    <input id="input-obra-metro" type="number" class="input-field">
+                    <input id="nova-obra-metro" type="number" class="input-field">
                 </div>
-                <button type="submit" class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition-colors">
-                    Salvar
-                </button>
+                <div class="flex space-x-4">
+                    <button type="submit" class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition-colors">
+                        Salvar
+                    </button>
+                    <button type="button" id="cancelar-nova-obra" class="w-full bg-gray-300 text-gray-800 py-2 rounded-lg hover:bg-gray-400 transition-colors">
+                        Cancelar
+                    </button>
+                </div>
             </form>
         </div>
 
-        <!-- Seção de Adiantamentos -->
-        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-            <h2 class="text-xl font-semibold mb-4">Controle de Vales</h2>
-            <form id="add-adiantamento-form" class="space-y-4">
-                <div class="flex flex-col">
-                    <label class="text-sm font-medium mb-1">Data:</label>
-                    <input type="date" name="data" required class="input-field">
-                </div>
-                <div class="flex flex-col">
-                    <label class="text-sm font-medium mb-1">Descrição:</label>
-                    <input type="text" name="descricao" placeholder="Ex: Vale semanal" class="input-field">
-                </div>
-                <div class="flex flex-col">
-                    <label class="text-sm font-medium mb-1">Valor (R$):</label>
-                    <input type="number" name="valor" placeholder="0.00" required class="input-field">
-                </div>
-                <button type="submit" class="w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors">
-                    + Adicionar Vale
-                </button>
-            </form>
-
-            <!-- Lista de Vales -->
-            <div class="mt-6">
-                <h3 class="font-medium mb-2">Histórico de Vales</h3>
-                <ul id="adiantamentos-list" class="divide-y divide-gray-200">
-                    <li class="py-4 text-center text-gray-500">Nenhum vale registrado</li>
-                </ul>
-            </div>
+        <!-- Abas para navegação -->
+        <div class="flex mb-4 bg-white rounded-xl shadow-lg p-2">
+            <div id="tab-detalhes" class="tab-button active">Detalhes</div>
+            <div id="tab-vales" class="tab-button">Vales</div>
+            <div id="tab-receitas" class="tab-button">Receitas</div>
+            <div id="tab-resumo" class="tab-button">Resumo</div>
         </div>
 
-        <!-- Resumo Financeiro -->
-        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-            <h2 class="text-xl font-semibold mb-4">Resumo Financeiro</h2>
-            <div class="grid grid-cols-3 gap-4 text-center">
-                <div class="bg-gray-50 p-4 rounded-xl">
-                    <p class="text-sm font-medium text-gray-500">Total da Obra</p>
-                    <p id="total-obra" class="text-lg font-bold">R$ 0,00</p>
+        <!-- Conteúdo das Abas -->
+        <div id="tab-content">
+            <!-- Detalhes da Obra -->
+            <div id="detalhes-content" class="tab-pane bg-white rounded-xl shadow-lg p-6 mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold">Detalhes da Obra</h2>
+                    <button id="edit-obra-btn" class="bg-blue-500 text-white rounded-full px-4 py-2 text-sm hover:bg-blue-600 transition-colors">
+                        Editar
+                    </button>
                 </div>
-                <div class="bg-gray-50 p-4 rounded-xl">
-                    <p class="text-sm font-medium text-gray-500">Total Vales</p>
-                    <p id="total-vales" class="text-lg font-bold">R$ 0,00</p>
+                
+                <!-- Modo Visualização -->
+                <div id="display-obra-data" class="space-y-3">
+                    <div class="flex items-center space-x-3 text-lg">
+                        <span class="text-blue-500">🏠</span>
+                        <span><strong>Obra:</strong> <span id="display-obra-nome">N/A</span></span>
+                    </div>
+                    <div class="flex items-center space-x-3 text-lg">
+                        <span class="text-blue-500">💲</span>
+                        <span><strong>Valor:</strong> <span id="display-obra-valor">R$ 0,00</span></span>
+                    </div>
+                    <div class="flex items-center space-x-3 text-lg">
+                        <span class="text-blue-500">📏</span>
+                        <span><strong>Metragem:</strong> <span id="display-obra-metro">0 m²</span></span>
+                    </div>
                 </div>
-                <div class="bg-gray-50 p-4 rounded-xl">
-                    <p class="text-sm font-medium text-gray-500">Saldo</p>
-                    <p id="saldo" class="text-lg font-bold">R$ 0,00</p>
-                </div>
-            </div>
-        </div>
 
-        <!-- Backup Simples -->
-        <div class="bg-white rounded-xl shadow-lg p-6">
-            <h2 class="text-xl font-semibold mb-4">Backup Local</h2>
-            <div class="flex space-x-4">
-                <button id="backup-btn" class="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transition-colors">
-                    Fazer Backup
-                </button>
-                <button id="restore-btn" class="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition-colors">
-                    Restaurar
-                </button>
+                <!-- Modo Edição -->
+                <form id="edit-obra-form" class="hidden space-y-4">
+                    <div class="flex flex-col">
+                        <label class="text-sm font-medium mb-1">Nome da Obra:</label>
+                        <input id="input-obra-nome" type="text" class="input-field">
+                    </div>
+                    <div class="flex flex-col">
+                        <label class="text-sm font-medium mb-1">Valor Total (R$):</label>
+                        <input id="input-obra-valor" type="number" class="input-field">
+                    </div>
+                    <div class="flex flex-col">
+                        <label class="text-sm font-medium mb-1">Metros Quadrados (m²):</label>
+                        <input id="input-obra-metro" type="number" class="input-field">
+                    </div>
+                    <div class="flex space-x-4">
+                        <button type="submit" class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition-colors">
+                            Salvar
+                        </button>
+                        <button type="button" id="cancelar-edicao" class="w-full bg-gray-300 text-gray-800 py-2 rounded-lg hover:bg-gray-400 transition-colors">
+                            Cancelar
+                        </button>
+                    </div>
+                </form>
             </div>
-            <p id="backup-status" class="text-sm text-gray-500 mt-2"></p>
+
+            <!-- Controle de Vales -->
+            <div id="vales-content" class="tab-pane bg-white rounded-xl shadow-lg p-6 mb-6 hidden">
+                <h2 class="text-xl font-semibold mb-4">Controle de Vales</h2>
+                <form id="add-adiantamento-form" class="space-y-4">
+                    <div class="flex flex-col">
+                        <label class="text-sm font-medium mb-1">Data:</label>
+                        <input type="date" name="data" required class="input-field">
+                    </div>
+                    <div class="flex flex-col">
+                        <label class="text-sm font-medium mb-1">Descrição:</label>
+                        <input type="text" name="descricao" placeholder="Ex: Vale semanal" class="input-field">
+                    </div>
+                    <div class="flex flex-col">
+                        <label class="text-sm font-medium mb-1">Valor (R$):</label>
+                        <input type="number" name="valor" placeholder="0.00" required class="input-field">
+                    </div>
+                    <button type="submit" class="w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors">
+                        + Adicionar Vale
+                    </button>
+                </form>
+
+                <!-- Lista de Vales -->
+                <div class="mt-6">
+                    <h3 class="font-medium mb-2">Histórico de Vales</h3>
+                    <ul id="adiantamentos-list" class="divide-y divide-gray-200">
+                        <li class="py-4 text-center text-gray-500">Nenhum vale registrado</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Adicionar Receitas -->
+            <div id="receitas-content" class="tab-pane bg-white rounded-xl shadow-lg p-6 mb-6 hidden">
+                <h2 class="text-xl font-semibold mb-4">Adicionar Receita</h2>
+                <form id="add-receita-form" class="space-y-4">
+                    <div class="flex flex-col">
+                        <label class="text-sm font-medium mb-1">Data:</label>
+                        <input type="date" name="data" required class="input-field">
+                    </div>
+                    <div class="flex flex-col">
+                        <label class="text-sm font-medium mb-1">Descrição:</label>
+                        <input type="text" name="descricao" placeholder="Ex: Serviço adicional" class="input-field">
+                    </div>
+                    <div class="flex flex-col">
+                        <label class="text-sm font-medium mb-1">Valor (R$):</label>
+                        <input type="number" name="valor" placeholder="0.00" required class="input-field">
+                    </div>
+                    <button type="submit" class="w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors">
+                        + Adicionar Receita
+                    </button>
+                </form>
+
+                <!-- Lista de Receitas -->
+                <div class="mt-6">
+                    <h3 class="font-medium mb-2">Histórico de Receitas</h3>
+                    <ul id="receitas-list" class="divide-y divide-gray-200">
+                        <li class="py-4 text-center text-gray-500">Nenhuma receita registrada</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Resumo Financeiro -->
+            <div id="resumo-content" class="tab-pane bg-white rounded-xl shadow-lg p-6 mb-6 hidden">
+                <h2 class="text-xl font-semibold mb-4">Resumo Financeiro</h2>
+                <div class="grid grid-cols-2 gap-4 text-center mb-6">
+                    <div class="bg-gray-50 p-4 rounded-xl">
+                        <p class="text-sm font-medium text-gray-500">Total da Obra</p>
+                        <p id="total-obra" class="text-lg font-bold">R$ 0,00</p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-xl">
+                        <p class="text-sm font-medium text-gray-500">Receitas Adicionais</p>
+                        <p id="total-receitas" class="text-lg font-bold">R$ 0,00</p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-xl">
+                        <p class="text-sm font-medium text-gray-500">Total Vales</p>
+                        <p id="total-vales" class="text-lg font-bold">R$ 0,00</p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-xl">
+                        <p class="text-sm font-medium text-gray-500">Saldo</p>
+                        <p id="saldo" class="text-lg font-bold">R$ 0,00</p>
+                    </div>
+                </div>
+
+                <div class="bg-blue-50 p-4 rounded-xl">
+                    <h3 class="font-medium mb-2">Sincronização com Nuvem</h3>
+                    <div class="flex space-x-4">
+                        <button id="sync-btn" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
+                            Sincronizar Agora
+                        </button>
+                    </div>
+                    <p id="sync-status" class="text-sm text-gray-500 mt-2"></p>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
+        // Configurações do Firebase (substitua com suas credenciais)
+        const firebaseConfig = {
+            apiKey: "SUA_API_KEY",
+            authDomain: "SEU_PROJETO.firebaseapp.com",
+            databaseURL: "https://SEU_PROJETO.firebaseio.com",
+            projectId: "SEU_PROJETO",
+            storageBucket: "SEU_PROJETO.appspot.com",
+            messagingSenderId: "SEU_SENDER_ID",
+            appId: "SEU_APP_ID"
+        };
+
+        // Inicializa Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
         // Configurações
         const SENHA_CORRETA = "Leticia180977";
         const DADOS_LOCAIS = "hilton_obra_data";
         
         // Estado do aplicativo
         let userData = {
-            obra: {
-                nome: "",
-                valor: 0,
-                metroQuadrado: 0
-            },
-            vales: []
+            obras: [], // Agora armazena múltiplas obras
+            obraAtual: null, // ID da obra selecionada
+            syncEnabled: false // Controle de sincronização
         };
 
         // Inicialização
@@ -177,128 +288,334 @@
                 }
             });
 
+            // Controle de abas
+            document.querySelectorAll('.tab-button').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // Ativa a aba clicada
+                    document.querySelectorAll('.tab-button').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    
+                    // Mostra o conteúdo correspondente
+                    document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.add('hidden'));
+                    
+                    const tabId = tab.id.replace('tab-', '');
+                    document.getElementById(`${tabId}-content`).classList.remove('hidden');
+                });
+            });
+
+            // Nova obra
+            document.getElementById('nova-obra-btn').addEventListener('click', () => {
+                document.getElementById('nova-obra-form-container').classList.remove('hidden');
+            });
+
+            document.getElementById('cancelar-nova-obra').addEventListener('click', () => {
+                document.getElementById('nova-obra-form-container').classList.add('hidden');
+                document.getElementById('nova-obra-form').reset();
+            });
+
+            document.getElementById('nova-obra-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                
+                const novaObra = {
+                    id: Date.now().toString(),
+                    nome: document.getElementById('nova-obra-nome').value,
+                    valor: parseFloat(document.getElementById('nova-obra-valor').value) || 0,
+                    metroQuadrado: parseFloat(document.getElementById('nova-obra-metro').value) || 0,
+                    vales: [],
+                    receitas: [],
+                    criadoEm: new Date().toISOString()
+                };
+                
+                userData.obras.push(novaObra);
+                userData.obraAtual = novaObra.id;
+                
+                salvarDados();
+                document.getElementById('nova-obra-form').reset();
+                document.getElementById('nova-obra-form-container').classList.add('hidden');
+                atualizarInterface();
+            });
+
             // Controle de edição da obra
             document.getElementById('edit-obra-btn').addEventListener('click', () => {
-                document.getElementById('display-obra-data').classList.toggle('hidden');
-                document.getElementById('edit-obra-form').classList.toggle('hidden');
+                document.getElementById('display-obra-data').classList.add('hidden');
+                document.getElementById('edit-obra-form').classList.remove('hidden');
                 
-                // Preenche formulário se estiver editando
-                if (!document.getElementById('edit-obra-form').classList.contains('hidden')) {
-                    document.getElementById('input-obra-nome').value = userData.obra.nome;
-                    document.getElementById('input-obra-valor').value = userData.obra.valor;
-                    document.getElementById('input-obra-metro').value = userData.obra.metroQuadrado;
+                const obraAtual = getObraAtual();
+                if (obraAtual) {
+                    document.getElementById('input-obra-nome').value = obraAtual.nome;
+                    document.getElementById('input-obra-valor').value = obraAtual.valor;
+                    document.getElementById('input-obra-metro').value = obraAtual.metroQuadrado;
                 }
+            });
+
+            document.getElementById('cancelar-edicao').addEventListener('click', () => {
+                document.getElementById('edit-obra-form').classList.add('hidden');
+                document.getElementById('display-obra-data').classList.remove('hidden');
             });
 
             // Salvar dados da obra
             document.getElementById('edit-obra-form').addEventListener('submit', (e) => {
                 e.preventDefault();
-                userData.obra = {
-                    nome: document.getElementById('input-obra-nome').value,
-                    valor: parseFloat(document.getElementById('input-obra-valor').value) || 0,
-                    metroQuadrado: parseFloat(document.getElementById('input-obra-metro').value) || 0
-                };
-                salvarDados();
-                document.getElementById('edit-obra-form').classList.add('hidden');
-                document.getElementById('display-obra-data').classList.remove('hidden');
-                atualizarInterface();
+                
+                const obraAtual = getObraAtual();
+                if (obraAtual) {
+                    obraAtual.nome = document.getElementById('input-obra-nome').value;
+                    obraAtual.valor = parseFloat(document.getElementById('input-obra-valor').value) || 0;
+                    obraAtual.metroQuadrado = parseFloat(document.getElementById('input-obra-metro').value) || 0;
+                    
+                    salvarDados();
+                    document.getElementById('edit-obra-form').classList.add('hidden');
+                    document.getElementById('display-obra-data').classList.remove('hidden');
+                    atualizarInterface();
+                }
             });
 
             // Adicionar vale
             document.getElementById('add-adiantamento-form').addEventListener('submit', (e) => {
                 e.preventDefault();
                 const form = e.target;
-                userData.vales.push({
-                    id: Date.now(),
-                    data: form.data.value,
-                    descricao: form.descricao.value,
-                    valor: parseFloat(form.valor.value) || 0
-                });
-                form.reset();
-                salvarDados();
-                atualizarInterface();
-            });
-
-            // Backup
-            document.getElementById('backup-btn').addEventListener('click', () => {
-                localStorage.setItem(DADOS_LOCAIS, JSON.stringify(userData));
-                document.getElementById('backup-status').textContent = "Backup realizado em " + new Date().toLocaleString();
-            });
-
-            // Restauração
-            document.getElementById('restore-btn').addEventListener('click', () => {
-                const dados = localStorage.getItem(DADOS_LOCAIS);
-                if (dados) {
-                    userData = JSON.parse(dados);
+                
+                const obraAtual = getObraAtual();
+                if (obraAtual) {
+                    obraAtual.vales.push({
+                        id: Date.now().toString(),
+                        data: form.data.value,
+                        descricao: form.descricao.value,
+                        valor: parseFloat(form.valor.value) || 0
+                    });
+                    
+                    form.reset();
+                    salvarDados();
                     atualizarInterface();
-                    document.getElementById('backup-status').textContent = "Dados restaurados com sucesso!";
-                } else {
-                    document.getElementById('backup-status').textContent = "Nenhum backup encontrado";
                 }
+            });
+
+            // Adicionar receita
+            document.getElementById('add-receita-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const form = e.target;
+                
+                const obraAtual = getObraAtual();
+                if (obraAtual) {
+                    obraAtual.receitas.push({
+                        id: Date.now().toString(),
+                        data: form.data.value,
+                        descricao: form.descricao.value,
+                        valor: parseFloat(form.valor.value) || 0
+                    });
+                    
+                    form.reset();
+                    salvarDados();
+                    atualizarInterface();
+                }
+            });
+
+            // Sincronização
+            document.getElementById('sync-btn').addEventListener('click', () => {
+                sincronizarDados();
             });
         });
 
         // Funções auxiliares
+        function getObraAtual() {
+            if (!userData.obraAtual) return null;
+            return userData.obras.find(o => o.id === userData.obraAtual);
+        }
+
         function carregarDados() {
-            const dados = localStorage.getItem(DADOS_LOCAIS);
-            if (dados) {
-                userData = JSON.parse(dados);
+            // Tenta carregar do localStorage primeiro
+            const dadosLocais = localStorage.getItem(DADOS_LOCAIS);
+            if (dadosLocais) {
+                userData = JSON.parse(dadosLocais);
             }
-            atualizarInterface();
+            
+            // Depois tenta sincronizar com a nuvem
+            sincronizarDados();
         }
 
         function salvarDados() {
+            // Salva localmente
             localStorage.setItem(DADOS_LOCAIS, JSON.stringify(userData));
+            
+            // Se estiver com sync ativado, salva na nuvem também
+            if (userData.syncEnabled) {
+                salvarNaNuvem();
+            }
+        }
+
+        function salvarNaNuvem() {
+            database.ref('obras/' + btoa(SENHA_CORRETA)).set(userData)
+                .then(() => {
+                    document.getElementById('sync-status').textContent = "Dados salvos na nuvem em " + new Date().toLocaleString();
+                })
+                .catch(error => {
+                    console.error("Erro ao salvar na nuvem:", error);
+                    document.getElementById('sync-status').textContent = "Erro ao salvar na nuvem";
+                });
+        }
+
+        function sincronizarDados() {
+            document.getElementById('sync-status').textContent = "Sincronizando...";
+            
+            database.ref('obras/' + btoa(SENHA_CORRETA)).once('value')
+                .then(snapshot => {
+                    const dadosRemotos = snapshot.val();
+                    
+                    if (dadosRemotos) {
+                        // Mescla dados locais e remotos
+                        userData = {
+                            ...dadosRemotos,
+                            // Mantém a obra atual selecionada
+                            obraAtual: userData.obraAtual || dadosRemotos.obraAtual
+                        };
+                        
+                        userData.syncEnabled = true;
+                        salvarDados();
+                        document.getElementById('sync-status').textContent = "Dados sincronizados em " + new Date().toLocaleString();
+                    } else {
+                        // Primeira sincronização - envia dados locais
+                        userData.syncEnabled = true;
+                        salvarNaNuvem();
+                    }
+                    
+                    atualizarInterface();
+                })
+                .catch(error => {
+                    console.error("Erro ao sincronizar:", error);
+                    document.getElementById('sync-status').textContent = "Erro ao sincronizar";
+                    userData.syncEnabled = false;
+                });
         }
 
         function atualizarInterface() {
-            // Atualiza dados da obra
-            document.getElementById('display-obra-nome').textContent = userData.obra.nome || "N/A";
-            document.getElementById('display-obra-valor').textContent = formatCurrency(userData.obra.valor);
-            document.getElementById('display-obra-metro').textContent = userData.obra.metroQuadrado ? `${userData.obra.metroQuadrado} m²` : "N/A";
-
-            // Atualiza lista de vales
-            const listaVales = document.getElementById('adiantamentos-list');
-            listaVales.innerHTML = userData.vales.length > 0 
-                ? userData.vales.map(vale => `
-                    <li class="py-4 flex justify-between items-center">
-                        <div>
-                            <p class="font-medium">${vale.descricao}</p>
-                            <p class="text-sm text-gray-500">${formatDate(vale.data)}</p>
-                        </div>
-                        <div class="flex items-center">
-                            <span class="font-semibold mr-2">${formatCurrency(vale.valor)}</span>
-                            <button class="text-red-500 p-1" data-id="${vale.id}">
-                                ✕
-                            </button>
-                        </div>
-                    </li>
+            // Atualiza lista de obras
+            const obrasList = document.getElementById('obras-list');
+            obrasList.innerHTML = userData.obras.length > 0 
+                ? userData.obras.map(obra => `
+                    <div class="flex-shrink-0">
+                        <button class="px-4 py-2 rounded-lg ${userData.obraAtual === obra.id ? 'bg-blue-500 text-white' : 'bg-gray-200'}" 
+                                data-id="${obra.id}">
+                            ${obra.nome || "Nova Obra"}
+                        </button>
+                    </div>
                 `).join('')
-                : '<li class="py-4 text-center text-gray-500">Nenhum vale registrado</li>';
+                : '<p class="text-gray-500">Nenhuma obra cadastrada</p>';
 
-            // Adiciona eventos de remoção
-            document.querySelectorAll('#adiantamentos-list button').forEach(btn => {
+            // Adiciona eventos de seleção de obra
+            document.querySelectorAll('#obras-list button').forEach(btn => {
                 btn.addEventListener('click', (e) => {
-                    const id = parseInt(e.target.closest('button').dataset.id);
-                    userData.vales = userData.vales.filter(v => v.id !== id);
+                    userData.obraAtual = e.target.dataset.id;
                     salvarDados();
                     atualizarInterface();
                 });
             });
 
-            atualizarResumo();
+            // Atualiza dados da obra atual
+            const obraAtual = getObraAtual();
+            if (obraAtual) {
+                // Detalhes da obra
+                document.getElementById('display-obra-nome').textContent = obraAtual.nome || "N/A";
+                document.getElementById('display-obra-valor').textContent = formatCurrency(obraAtual.valor);
+                document.getElementById('display-obra-metro').textContent = obraAtual.metroQuadrado ? `${obraAtual.metroQuadrado} m²` : "N/A";
+
+                // Lista de vales
+                const listaVales = document.getElementById('adiantamentos-list');
+                listaVales.innerHTML = obraAtual.vales.length > 0 
+                    ? obraAtual.vales.map(vale => `
+                        <li class="py-4 flex justify-between items-center">
+                            <div>
+                                <p class="font-medium">${vale.descricao}</p>
+                                <p class="text-sm text-gray-500">${formatDate(vale.data)}</p>
+                            </div>
+                            <div class="flex items-center">
+                                <span class="font-semibold mr-2">${formatCurrency(vale.valor)}</span>
+                                <button class="text-red-500 p-1" data-id="${vale.id}">
+                                    ✕
+                                </button>
+                            </div>
+                        </li>
+                    `).join('')
+                    : '<li class="py-4 text-center text-gray-500">Nenhum vale registrado</li>';
+
+                // Adiciona eventos de remoção de vales
+                document.querySelectorAll('#adiantamentos-list button').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const id = e.target.closest('button').dataset.id;
+                        obraAtual.vales = obraAtual.vales.filter(v => v.id !== id);
+                        salvarDados();
+                        atualizarInterface();
+                    });
+                });
+
+                // Lista de receitas
+                const listaReceitas = document.getElementById('receitas-list');
+                listaReceitas.innerHTML = obraAtual.receitas.length > 0 
+                    ? obraAtual.receitas.map(receita => `
+                        <li class="py-4 flex justify-between items-center">
+                            <div>
+                                <p class="font-medium">${receita.descricao}</p>
+                                <p class="text-sm text-gray-500">${formatDate(receita.data)}</p>
+                            </div>
+                            <div class="flex items-center">
+                                <span class="font-semibold mr-2">${formatCurrency(receita.valor)}</span>
+                                <button class="text-red-500 p-1" data-id="${receita.id}">
+                                    ✕
+                                </button>
+                            </div>
+                        </li>
+                    `).join('')
+                    : '<li class="py-4 text-center text-gray-500">Nenhuma receita registrada</li>';
+
+                // Adiciona eventos de remoção de receitas
+                document.querySelectorAll('#receitas-list button').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const id = e.target.closest('button').dataset.id;
+                        obraAtual.receitas = obraAtual.receitas.filter(r => r.id !== id);
+                        salvarDados();
+                        atualizarInterface();
+                    });
+                });
+
+                atualizarResumo();
+            } else {
+                // Limpa os dados se não houver obra selecionada
+                document.getElementById('display-obra-nome').textContent = "N/A";
+                document.getElementById('display-obra-valor').textContent = "R$ 0,00";
+                document.getElementById('display-obra-metro').textContent = "0 m²";
+                
+                document.getElementById('adiantamentos-list').innerHTML = 
+                    '<li class="py-4 text-center text-gray-500">Nenhum vale registrado</li>';
+                
+                document.getElementById('receitas-list').innerHTML = 
+                    '<li class="py-4 text-center text-gray-500">Nenhuma receita registrada</li>';
+                
+                atualizarResumo();
+            }
         }
 
         function atualizarResumo() {
-            const totalVales = userData.vales.reduce((sum, vale) => sum + vale.valor, 0);
-            const saldo = userData.obra.valor - totalVales;
+            const obraAtual = getObraAtual();
+            
+            if (obraAtual) {
+                const totalVales = obraAtual.vales.reduce((sum, vale) => sum + vale.valor, 0);
+                const totalReceitas = obraAtual.receitas.reduce((sum, receita) => sum + receita.valor, 0);
+                const valorTotalObra = obraAtual.valor + totalReceitas;
+                const saldo = valorTotalObra - totalVales;
 
-            document.getElementById('total-obra').textContent = formatCurrency(userData.obra.valor);
-            document.getElementById('total-vales').textContent = formatCurrency(totalVales);
-            document.getElementById('saldo').textContent = formatCurrency(saldo);
-            document.getElementById('saldo').className = saldo < 0 
-                ? "text-lg font-bold text-red-600" 
-                : "text-lg font-bold text-green-600";
+                document.getElementById('total-obra').textContent = formatCurrency(obraAtual.valor);
+                document.getElementById('total-receitas').textContent = formatCurrency(totalReceitas);
+                document.getElementById('total-vales').textContent = formatCurrency(totalVales);
+                document.getElementById('saldo').textContent = formatCurrency(saldo);
+                document.getElementById('saldo').className = saldo < 0 
+                    ? "text-lg font-bold text-red-600" 
+                    : "text-lg font-bold text-green-600";
+            } else {
+                document.getElementById('total-obra').textContent = "R$ 0,00";
+                document.getElementById('total-receitas').textContent = "R$ 0,00";
+                document.getElementById('total-vales').textContent = "R$ 0,00";
+                document.getElementById('saldo').textContent = "R$ 0,00";
+                document.getElementById('saldo').className = "text-lg font-bold";
+            }
         }
 
         function formatCurrency(value) {
