@@ -5,479 +5,302 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gerenciador de Obras Hilton</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Firebase -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
-        body { font-family: 'Arial', sans-serif; }
-        .loading-spinner {
-            border: 3px solid rgba(0, 0, 0, 0.1);
-            border-radius: 50%;
-            border-top: 3px solid #3B82F6;
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
-            display: inline-block;
-            vertical-align: middle;
-            margin-right: 8px;
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .container { max-width: 640px; margin: 0 auto; }
+        .input-field {
+            width: 100%; padding: 10px; border: 1px solid #d1d5db;
+            border-radius: 0.5rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .hidden { display: none; }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="bg-gray-100 p-4">
     <!-- Tela de Login -->
     <div id="login-screen" class="flex items-center justify-center h-screen">
-        <div class="bg-white p-8 rounded-lg shadow-md w-96">
-            <h1 class="text-2xl font-bold text-center mb-6">Controle de Obras</h1>
+        <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
+            <h1 class="text-2xl font-bold text-center mb-6">Acesso Restrito</h1>
             <form id="login-form" class="space-y-4">
                 <div>
-                    <label class="block mb-2">Senha de Acesso:</label>
-                    <input type="password" id="password" class="w-full p-2 border rounded" required>
+                    <label class="block text-sm font-medium mb-1">Senha:</label>
+                    <input type="password" id="password" class="input-field" required>
                 </div>
-                <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
-                    Acessar Sistema
+                <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                    Entrar
                 </button>
             </form>
         </div>
     </div>
 
     <!-- Aplicativo Principal -->
-    <div id="app" class="hidden container mx-auto p-4">
+    <div id="app" class="hidden container">
         <!-- Cabeçalho -->
-        <header class="flex justify-between items-center mb-6">
-            <div>
-                <h1 class="text-2xl font-bold">Controle Financeiro de Obras</h1>
-                <div id="sync-status" class="text-sm text-gray-600 mt-1">
-                    <span id="sync-message">Conectado</span>
-                </div>
-            </div>
-            <button id="nova-obra-btn" class="bg-green-600 text-white px-4 py-2 rounded">
-                + Nova Obra
-            </button>
+        <header class="text-center mt-8 mb-6">
+            <h1 class="text-3xl font-bold text-gray-900">Gerenciador de Obras</h1>
+            <p class="text-gray-600 mt-2">Controle completo de obras e vales</p>
         </header>
 
-        <!-- Corpo do Aplicativo -->
-        <div class="flex flex-col md:flex-row gap-6">
-            <!-- Lista de Obras -->
-            <div class="w-full md:w-1/3 bg-white p-4 rounded-lg shadow">
-                <h2 class="text-xl font-semibold mb-4">Suas Obras</h2>
-                <div id="obras-list" class="space-y-2 min-h-[200px]">
-                    <div class="text-center py-4 text-gray-500">Nenhuma obra cadastrada</div>
+        <!-- Seção de Detalhes da Obra -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold">Detalhes da Obra</h2>
+                <button id="edit-obra-btn" class="bg-blue-500 text-white rounded-full px-4 py-2 text-sm hover:bg-blue-600 transition-colors">
+                    Editar
+                </button>
+            </div>
+            
+            <!-- Modo Visualização -->
+            <div id="display-obra-data" class="space-y-3">
+                <div class="flex items-center space-x-3 text-lg">
+                    <span class="text-blue-500">🏠</span>
+                    <span><strong>Obra:</strong> <span id="display-obra-nome">N/A</span></span>
+                </div>
+                <div class="flex items-center space-x-3 text-lg">
+                    <span class="text-blue-500">💲</span>
+                    <span><strong>Valor:</strong> <span id="display-obra-valor">R$ 0,00</span></span>
+                </div>
+                <div class="flex items-center space-x-3 text-lg">
+                    <span class="text-blue-500">📏</span>
+                    <span><strong>Metragem:</strong> <span id="display-obra-metro">0 m²</span></span>
                 </div>
             </div>
 
-            <!-- Detalhes da Obra -->
-            <div class="w-full md:w-2/3 bg-white p-4 rounded-lg shadow">
-                <div id="obra-details" class="min-h-[300px]">
-                    <div class="text-center py-8 text-gray-500">
-                        Selecione uma obra ou crie uma nova para começar
-                    </div>
+            <!-- Modo Edição -->
+            <form id="edit-obra-form" class="hidden space-y-4">
+                <div class="flex flex-col">
+                    <label class="text-sm font-medium mb-1">Nome da Obra:</label>
+                    <input id="input-obra-nome" type="text" class="input-field">
+                </div>
+                <div class="flex flex-col">
+                    <label class="text-sm font-medium mb-1">Valor Total (R$):</label>
+                    <input id="input-obra-valor" type="number" class="input-field">
+                </div>
+                <div class="flex flex-col">
+                    <label class="text-sm font-medium mb-1">Metros Quadrados (m²):</label>
+                    <input id="input-obra-metro" type="number" class="input-field">
+                </div>
+                <button type="submit" class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition-colors">
+                    Salvar
+                </button>
+            </form>
+        </div>
+
+        <!-- Seção de Adiantamentos -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Controle de Vales</h2>
+            <form id="add-adiantamento-form" class="space-y-4">
+                <div class="flex flex-col">
+                    <label class="text-sm font-medium mb-1">Data:</label>
+                    <input type="date" name="data" required class="input-field">
+                </div>
+                <div class="flex flex-col">
+                    <label class="text-sm font-medium mb-1">Descrição:</label>
+                    <input type="text" name="descricao" placeholder="Ex: Vale semanal" class="input-field">
+                </div>
+                <div class="flex flex-col">
+                    <label class="text-sm font-medium mb-1">Valor (R$):</label>
+                    <input type="number" name="valor" placeholder="0.00" required class="input-field">
+                </div>
+                <button type="submit" class="w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors">
+                    + Adicionar Vale
+                </button>
+            </form>
+
+            <!-- Lista de Vales -->
+            <div class="mt-6">
+                <h3 class="font-medium mb-2">Histórico de Vales</h3>
+                <ul id="adiantamentos-list" class="divide-y divide-gray-200">
+                    <li class="py-4 text-center text-gray-500">Nenhum vale registrado</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Resumo Financeiro -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Resumo Financeiro</h2>
+            <div class="grid grid-cols-3 gap-4 text-center">
+                <div class="bg-gray-50 p-4 rounded-xl">
+                    <p class="text-sm font-medium text-gray-500">Total da Obra</p>
+                    <p id="total-obra" class="text-lg font-bold">R$ 0,00</p>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-xl">
+                    <p class="text-sm font-medium text-gray-500">Total Vales</p>
+                    <p id="total-vales" class="text-lg font-bold">R$ 0,00</p>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-xl">
+                    <p class="text-sm font-medium text-gray-500">Saldo</p>
+                    <p id="saldo" class="text-lg font-bold">R$ 0,00</p>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Modal Nova Obra -->
-    <div id="modal-nova-obra" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4">
-        <div class="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 class="text-xl font-bold mb-4">Cadastrar Nova Obra</h2>
-            <form id="form-nova-obra">
-                <div class="mb-4">
-                    <label class="block mb-2">Nome da Obra:</label>
-                    <input type="text" id="obra-nome" class="w-full p-2 border rounded" required>
-                </div>
-                <div class="mb-4">
-                    <label class="block mb-2">Valor Inicial (R$):</label>
-                    <input type="number" id="obra-valor" class="w-full p-2 border rounded" required>
-                </div>
-                <div class="flex justify-end space-x-2">
-                    <button type="button" id="cancelar-obra" class="px-4 py-2 border rounded">
-                        Cancelar
-                    </button>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">
-                        Salvar Obra
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal Novo Serviço -->
-    <div id="modal-novo-servico" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4">
-        <div class="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 class="text-xl font-bold mb-4">Adicionar Serviço/Receita</h2>
-            <form id="form-novo-servico">
-                <div class="mb-4">
-                    <label class="block mb-2">Descrição:</label>
-                    <input type="text" id="servico-descricao" class="w-full p-2 border rounded" required>
-                </div>
-                <div class="mb-4">
-                    <label class="block mb-2">Valor (R$):</label>
-                    <input type="number" id="servico-valor" class="w-full p-2 border rounded" required>
-                </div>
-                <div class="mb-4">
-                    <label class="block mb-2">Data:</label>
-                    <input type="date" id="servico-data" class="w-full p-2 border rounded" required>
-                </div>
-                <div class="flex justify-end space-x-2">
-                    <button type="button" id="cancelar-servico" class="px-4 py-2 border rounded">
-                        Cancelar
-                    </button>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">
-                        Adicionar
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal Novo Vale -->
-    <div id="modal-novo-vale" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4">
-        <div class="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 class="text-xl font-bold mb-4">Registrar Vale</h2>
-            <form id="form-novo-vale">
-                <div class="mb-4">
-                    <label class="block mb-2">Descrição:</label>
-                    <input type="text" id="vale-descricao" class="w-full p-2 border rounded" required>
-                </div>
-                <div class="mb-4">
-                    <label class="block mb-2">Valor (R$):</label>
-                    <input type="number" id="vale-valor" class="w-full p-2 border rounded" required>
-                </div>
-                <div class="mb-4">
-                    <label class="block mb-2">Data:</label>
-                    <input type="date" id="vale-data" class="w-full p-2 border rounded" required>
-                </div>
-                <div class="flex justify-end space-x-2">
-                    <button type="button" id="cancelar-vale" class="px-4 py-2 border rounded">
-                        Cancelar
-                    </button>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">
-                        Registrar
-                    </button>
-                </div>
-            </form>
+        <!-- Backup Simples -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-xl font-semibold mb-4">Backup Local</h2>
+            <div class="flex space-x-4">
+                <button id="backup-btn" class="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transition-colors">
+                    Fazer Backup
+                </button>
+                <button id="restore-btn" class="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition-colors">
+                    Restaurar
+                </button>
+            </div>
+            <p id="backup-status" class="text-sm text-gray-500 mt-2"></p>
         </div>
     </div>
 
     <script>
-        // 1. Configuração do Firebase (SUBSTITUA COM SUAS CREDENCIAIS)
-        const firebaseConfig = {
-            apiKey: "SUA_API_KEY",
-            authDomain: "SEU_PROJETO.firebaseapp.com",
-            databaseURL: "https://SEU_PROJETO.firebaseio.com",
-            projectId: "SEU_PROJETO",
-            storageBucket: "SEU_PROJETO.appspot.com",
-            messagingSenderId: "SEU_SENDER_ID",
-            appId: "SEU_APP_ID"
-        };
-
-        // Inicializa Firebase
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
-
-        // 2. Configurações do Aplicativo
+        // Configurações
         const SENHA_CORRETA = "Leticia180977";
+        const DADOS_LOCAIS = "hilton_obra_data";
         
-        // 3. Estado do Aplicativo
+        // Estado do aplicativo
         let userData = {
-            obras: [],
-            obraSelecionada: null
+            obra: {
+                nome: "",
+                valor: 0,
+                metroQuadrado: 0
+            },
+            vales: []
         };
 
-        // 4. Inicialização
+        // Inicialização
         document.addEventListener('DOMContentLoaded', () => {
-            // Configura primeiro os event listeners
-            configurarEventListeners();
-            
-            // Configura o login
-            document.getElementById('login-form').addEventListener('submit', async (e) => {
+            // Login
+            document.getElementById('login-form').addEventListener('submit', (e) => {
                 e.preventDefault();
-                const senha = document.getElementById('password').value;
-                if (senha === SENHA_CORRETA) {
-                    mostrarLoading(true, "Iniciando...");
+                if (document.getElementById('password').value === SENHA_CORRETA) {
                     document.getElementById('login-screen').classList.add('hidden');
                     document.getElementById('app').classList.remove('hidden');
-                    
-                    try {
-                        // Verifica se há dados
-                        const hasData = await verificarDadosExistentes();
-                        
-                        if (!hasData) {
-                            mostrarMensagem("Pronto para começar!");
-                            userData = { obras: [], obraSelecionada: null };
-                        } else {
-                            await carregarDadosIniciais();
-                            mostrarMensagem("Dados carregados");
-                        }
-                        
-                        atualizarInterface();
-                        configurarSincronizacaoTempoReal();
-                    } catch (error) {
-                        console.error("Erro:", error);
-                        mostrarMensagem("Usando dados locais", true);
-                        carregarDadosLocais();
-                    } finally {
-                        mostrarLoading(false);
-                    }
+                    carregarDados();
                 } else {
                     alert("Senha incorreta!");
                 }
             });
-        });
 
-        // 5. Funções de Carregamento de Dados
-        async function verificarDadosExistentes() {
-            return new Promise((resolve) => {
-                const ref = database.ref('obras/' + btoa(SENHA_CORRETA));
+            // Controle de edição da obra
+            document.getElementById('edit-obra-btn').addEventListener('click', () => {
+                document.getElementById('display-obra-data').classList.toggle('hidden');
+                document.getElementById('edit-obra-form').classList.toggle('hidden');
                 
-                ref.once('value').then(snapshot => {
-                    resolve(snapshot.exists());
-                }).catch(() => {
-                    resolve(false);
-                });
-            });
-        }
-
-        async function carregarDadosIniciais() {
-            return new Promise((resolve, reject) => {
-                const ref = database.ref('obras/' + btoa(SENHA_CORRETA));
-                
-                const timeout = setTimeout(() => {
-                    ref.off();
-                    reject(new Error("Timeout ao conectar ao servidor"));
-                }, 8000);
-
-                ref.once('value').then(snapshot => {
-                    clearTimeout(timeout);
-                    const dados = snapshot.val();
-                    
-                    if (dados) {
-                        userData = dados;
-                        localStorage.setItem('obras_backup', JSON.stringify(userData));
-                        resolve();
-                    } else {
-                        userData = { obras: [], obraSelecionada: null };
-                        salvarDados().then(resolve).catch(reject);
-                    }
-                }).catch(error => {
-                    clearTimeout(timeout);
-                    reject(error);
-                });
-            });
-        }
-
-        function carregarDadosLocais() {
-            const dadosLocais = localStorage.getItem('obras_backup');
-            if (dadosLocais) {
-                userData = JSON.parse(dadosLocais);
-                atualizarInterface();
-            } else {
-                userData = { obras: [], obraSelecionada: null };
-                atualizarInterface();
-            }
-        }
-
-        function configurarSincronizacaoTempoReal() {
-            const ref = database.ref('obras/' + btoa(SENHA_CORRETA));
-            
-            ref.on('value', (snapshot) => {
-                const dados = snapshot.val();
-                if (dados) {
-                    userData = dados;
-                    localStorage.setItem('obras_backup', JSON.stringify(userData));
-                    atualizarInterface();
+                // Preenche formulário se estiver editando
+                if (!document.getElementById('edit-obra-form').classList.contains('hidden')) {
+                    document.getElementById('input-obra-nome').value = userData.obra.nome;
+                    document.getElementById('input-obra-valor').value = userData.obra.valor;
+                    document.getElementById('input-obra-metro').value = userData.obra.metroQuadrado;
                 }
             });
-        }
 
-        // 6. Funções para Salvar Dados
-        async function salvarDados() {
-            return new Promise((resolve, reject) => {
-                mostrarMensagem("Salvando dados...");
-                
-                database.ref('obras/' + btoa(SENHA_CORRETA)).set(userData)
-                    .then(() => {
-                        localStorage.setItem('obras_backup', JSON.stringify(userData));
-                        resolve();
-                    })
-                    .catch(error => {
-                        console.error("Erro ao salvar:", error);
-                        reject(error);
-                    });
+            // Salvar dados da obra
+            document.getElementById('edit-obra-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                userData.obra = {
+                    nome: document.getElementById('input-obra-nome').value,
+                    valor: parseFloat(document.getElementById('input-obra-valor').value) || 0,
+                    metroQuadrado: parseFloat(document.getElementById('input-obra-metro').value) || 0
+                };
+                salvarDados();
+                document.getElementById('edit-obra-form').classList.add('hidden');
+                document.getElementById('display-obra-data').classList.remove('hidden');
+                atualizarInterface();
             });
-        }
 
-        // 7. Funções de Interface
-        function mostrarLoading(mostrar, mensagem = "Processando...") {
-            const messageElement = document.getElementById('sync-message');
-            if (mostrar) {
-                messageElement.innerHTML = `<span class="loading-spinner"></span> ${mensagem}`;
-            } else {
-                messageElement.textContent = "Conectado";
+            // Adicionar vale
+            document.getElementById('add-adiantamento-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const form = e.target;
+                userData.vales.push({
+                    id: Date.now(),
+                    data: form.data.value,
+                    descricao: form.descricao.value,
+                    valor: parseFloat(form.valor.value) || 0
+                });
+                form.reset();
+                salvarDados();
+                atualizarInterface();
+            });
+
+            // Backup
+            document.getElementById('backup-btn').addEventListener('click', () => {
+                localStorage.setItem(DADOS_LOCAIS, JSON.stringify(userData));
+                document.getElementById('backup-status').textContent = "Backup realizado em " + new Date().toLocaleString();
+            });
+
+            // Restauração
+            document.getElementById('restore-btn').addEventListener('click', () => {
+                const dados = localStorage.getItem(DADOS_LOCAIS);
+                if (dados) {
+                    userData = JSON.parse(dados);
+                    atualizarInterface();
+                    document.getElementById('backup-status').textContent = "Dados restaurados com sucesso!";
+                } else {
+                    document.getElementById('backup-status').textContent = "Nenhum backup encontrado";
+                }
+            });
+        });
+
+        // Funções auxiliares
+        function carregarDados() {
+            const dados = localStorage.getItem(DADOS_LOCAIS);
+            if (dados) {
+                userData = JSON.parse(dados);
             }
+            atualizarInterface();
         }
 
-        function mostrarMensagem(mensagem, isError = false) {
-            const messageElement = document.getElementById('sync-message');
-            messageElement.textContent = mensagem;
-            messageElement.style.color = isError ? "#EF4444" : "#10B981";
+        function salvarDados() {
+            localStorage.setItem(DADOS_LOCAIS, JSON.stringify(userData));
         }
 
         function atualizarInterface() {
-            atualizarListaObras();
-            atualizarDetalhesObra();
-        }
+            // Atualiza dados da obra
+            document.getElementById('display-obra-nome').textContent = userData.obra.nome || "N/A";
+            document.getElementById('display-obra-valor').textContent = formatCurrency(userData.obra.valor);
+            document.getElementById('display-obra-metro').textContent = userData.obra.metroQuadrado ? `${userData.obra.metroQuadrado} m²` : "N/A";
 
-        function atualizarListaObras() {
-            const obrasList = document.getElementById('obras-list');
-            
-            if (userData.obras.length === 0) {
-                obrasList.innerHTML = '<div class="text-center py-4 text-gray-500">Nenhuma obra cadastrada</div>';
-                return;
-            }
-            
-            obrasList.innerHTML = userData.obras.map(obra => `
-                <div class="p-3 border rounded cursor-pointer mb-2 ${userData.obraSelecionada === obra.id ? 'bg-blue-50 border-blue-200' : 'bg-white'}" 
-                     data-id="${obra.id}">
-                    <div class="flex justify-between items-center">
-                        <h3 class="font-medium">${obra.nome}</h3>
-                        <span class="text-xs px-2 py-1 rounded ${obra.status === 'concluida' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
-                            ${obra.status === 'concluida' ? 'Concluída' : 'Em andamento'}
-                        </span>
-                    </div>
-                    <p class="text-sm text-gray-600 mt-1">Valor: ${formatCurrency(obra.valorInicial)}</p>
-                </div>
-            `).join('');
-            
-            // Adiciona eventos de clique
-            document.querySelectorAll('#obras-list > div').forEach(card => {
-                card.addEventListener('click', (e) => {
-                    userData.obraSelecionada = e.currentTarget.dataset.id;
+            // Atualiza lista de vales
+            const listaVales = document.getElementById('adiantamentos-list');
+            listaVales.innerHTML = userData.vales.length > 0 
+                ? userData.vales.map(vale => `
+                    <li class="py-4 flex justify-between items-center">
+                        <div>
+                            <p class="font-medium">${vale.descricao}</p>
+                            <p class="text-sm text-gray-500">${formatDate(vale.data)}</p>
+                        </div>
+                        <div class="flex items-center">
+                            <span class="font-semibold mr-2">${formatCurrency(vale.valor)}</span>
+                            <button class="text-red-500 p-1" data-id="${vale.id}">
+                                ✕
+                            </button>
+                        </div>
+                    </li>
+                `).join('')
+                : '<li class="py-4 text-center text-gray-500">Nenhum vale registrado</li>';
+
+            // Adiciona eventos de remoção
+            document.querySelectorAll('#adiantamentos-list button').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const id = parseInt(e.target.closest('button').dataset.id);
+                    userData.vales = userData.vales.filter(v => v.id !== id);
                     salvarDados();
+                    atualizarInterface();
                 });
             });
+
+            atualizarResumo();
         }
 
-        function atualizarDetalhesObra() {
-            const obraDetails = document.getElementById('obra-details');
-            
-            if (!userData.obraSelecionada || userData.obras.length === 0) {
-                obraDetails.innerHTML = '<div class="text-center py-8 text-gray-500">Selecione uma obra ou crie uma nova para começar</div>';
-                return;
-            }
-            
-            const obra = userData.obras.find(o => o.id === userData.obraSelecionada);
-            if (!obra) return;
-            
-            // Calcula totais
-            const totalServicos = obra.servicos.reduce((sum, s) => sum + s.valor, 0);
-            const totalVales = obra.vales.reduce((sum, v) => sum + v.valor, 0);
-            const valorTotal = obra.valorInicial + totalServicos;
-            const saldo = valorTotal - totalVales;
-            
-            obraDetails.innerHTML = `
-                <div class="mb-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-xl font-bold">${obra.nome}</h2>
-                        <div class="flex space-x-2">
-                            <button id="concluir-obra-btn" class="px-3 py-1 text-sm ${obra.status === 'concluida' ? 'bg-gray-200' : 'bg-green-600 text-white'} rounded">
-                                ${obra.status === 'concluida' ? 'Obra Concluída' : 'Marcar como Concluída'}
-                            </button>
-                            <button id="novo-servico-btn" class="px-3 py-1 bg-blue-600 text-white text-sm rounded">
-                                + Serviço
-                            </button>
-                            <button id="novo-vale-btn" class="px-3 py-1 bg-blue-600 text-white text-sm rounded">
-                                + Vale
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                        <div class="bg-gray-50 p-3 rounded">
-                            <p class="text-sm text-gray-600">Valor Inicial</p>
-                            <p class="font-bold">${formatCurrency(obra.valorInicial)}</p>
-                        </div>
-                        <div class="bg-gray-50 p-3 rounded">
-                            <p class="text-sm text-gray-600">Serviços Adicionais</p>
-                            <p class="font-bold">${formatCurrency(totalServicos)}</p>
-                        </div>
-                        <div class="bg-gray-50 p-3 rounded">
-                            <p class="text-sm text-gray-600">Total Vales</p>
-                            <p class="font-bold">${formatCurrency(totalVales)}</p>
-                        </div>
-                        <div class="bg-gray-50 p-3 rounded">
-                            <p class="text-sm text-gray-600">Saldo Disponível</p>
-                            <p class="font-bold ${saldo < 0 ? 'text-red-600' : 'text-green-600'}">${formatCurrency(saldo)}</p>
-                        </div>
-                    </div>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <h3 class="font-semibold mb-2">Serviços Adicionais</h3>
-                            ${obra.servicos.length > 0 ? `
-                                <div class="border rounded divide-y">
-                                    ${obra.servicos.map(servico => `
-                                        <div class="p-3 flex justify-between">
-                                            <div>
-                                                <p>${servico.descricao}</p>
-                                                <p class="text-sm text-gray-500">${formatDate(servico.data)}</p>
-                                            </div>
-                                            <div class="font-medium">${formatCurrency(servico.valor)}</div>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            ` : '<p class="text-gray-500 text-center py-4">Nenhum serviço adicional registrado</p>'}
-                        </div>
-                        
-                        <div>
-                            <h3 class="font-semibold mb-2">Histórico de Vales</h3>
-                            ${obra.vales.length > 0 ? `
-                                <div class="border rounded divide-y">
-                                    ${obra.vales.map(vale => `
-                                        <div class="p-3 flex justify-between">
-                                            <div>
-                                                <p>${vale.descricao}</p>
-                                                <p class="text-sm text-gray-500">${formatDate(vale.data)}</p>
-                                            </div>
-                                            <div class="font-medium">${formatCurrency(vale.valor)}</div>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            ` : '<p class="text-gray-500 text-center py-4">Nenhum vale registrado</p>'}
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            // Configura eventos dos botões
-            if (document.getElementById('novo-servico-btn')) {
-                document.getElementById('novo-servico-btn').addEventListener('click', () => {
-                    document.getElementById('modal-novo-servico').classList.remove('hidden');
-                    document.getElementById('servico-data').value = new Date().toISOString().split('T')[0];
-                });
-            }
-            
-            if (document.getElementById('novo-vale-btn')) {
-                document.getElementById('novo-vale-btn').addEventListener('click', () => {
-                    document.getElementById('modal-novo-vale').classList.remove('hidden');
-                    document.getElementById('vale-data').value = new Date().toISOString().split('T')[0];
-                });
-            }
-            
-            if (document.getElementById('concluir-obra-btn') && obra.status !== 'concluida') {
-                document.getElementById('concluir-obra-btn').addEventListener('click', () => {
-                    obra.status = 'concluida';
-                    salvarDados();
-                });
-            }
+        function atualizarResumo() {
+            const totalVales = userData.vales.reduce((sum, vale) => sum + vale.valor, 0);
+            const saldo = userData.obra.valor - totalVales;
+
+            document.getElementById('total-obra').textContent = formatCurrency(userData.obra.valor);
+            document.getElementById('total-vales').textContent = formatCurrency(totalVales);
+            document.getElementById('saldo').textContent = formatCurrency(saldo);
+            document.getElementById('saldo').className = saldo < 0 
+                ? "text-lg font-bold text-red-600" 
+                : "text-lg font-bold text-green-600";
         }
 
-        // 8. Funções Auxiliares
         function formatCurrency(value) {
             return new Intl.NumberFormat('pt-BR', { 
                 style: 'currency', 
@@ -489,109 +312,6 @@
             if (!dateString) return "N/A";
             const date = new Date(dateString);
             return date.toLocaleDateString('pt-BR');
-        }
-
-        // 9. Configuração Completa dos Event Listeners
-        function configurarEventListeners() {
-            // Nova Obra
-            document.getElementById('nova-obra-btn').addEventListener('click', () => {
-                if (!document.getElementById('modal-nova-obra').classList.contains('hidden')) return;
-                
-                document.getElementById('modal-nova-obra').classList.remove('hidden');
-                document.getElementById('obra-nome').focus();
-            });
-
-            document.getElementById('cancelar-obra').addEventListener('click', () => {
-                document.getElementById('modal-nova-obra').classList.add('hidden');
-                document.getElementById('form-nova-obra').reset();
-            });
-
-            document.getElementById('form-nova-obra').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const novaObra = {
-                    id: Date.now().toString(),
-                    nome: document.getElementById('obra-nome').value,
-                    valorInicial: parseFloat(document.getElementById('obra-valor').value) || 0,
-                    servicos: [],
-                    vales: [],
-                    dataCriacao: new Date().toISOString(),
-                    status: 'andamento'
-                };
-                
-                userData.obras.push(novaObra);
-                userData.obraSelecionada = novaObra.id;
-                
-                document.getElementById('modal-nova-obra').classList.add('hidden');
-                document.getElementById('form-nova-obra').reset();
-                
-                try {
-                    await salvarDados();
-                    atualizarInterface();
-                } catch (error) {
-                    console.error("Erro ao salvar obra:", error);
-                    mostrarMensagem("Erro ao salvar obra", true);
-                }
-            });
-
-            // Novo Serviço
-            document.getElementById('cancelar-servico').addEventListener('click', () => {
-                document.getElementById('modal-novo-servico').classList.add('hidden');
-                document.getElementById('form-novo-servico').reset();
-            });
-
-            document.getElementById('form-novo-servico').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const obra = userData.obras.find(o => o.id === userData.obraSelecionada);
-                if (obra) {
-                    obra.servicos.push({
-                        id: Date.now().toString(),
-                        descricao: document.getElementById('servico-descricao').value,
-                        valor: parseFloat(document.getElementById('servico-valor').value) || 0,
-                        data: document.getElementById('servico-data').value
-                    });
-                    
-                    document.getElementById('modal-novo-servico').classList.add('hidden');
-                    document.getElementById('form-novo-servico').reset();
-                    
-                    try {
-                        await salvarDados();
-                        atualizarInterface();
-                    } catch (error) {
-                        console.error("Erro ao salvar serviço:", error);
-                        mostrarMensagem("Erro ao salvar serviço", true);
-                    }
-                }
-            });
-
-            // Novo Vale
-            document.getElementById('cancelar-vale').addEventListener('click', () => {
-                document.getElementById('modal-novo-vale').classList.add('hidden');
-                document.getElementById('form-novo-vale').reset();
-            });
-
-            document.getElementById('form-novo-vale').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const obra = userData.obras.find(o => o.id === userData.obraSelecionada);
-                if (obra) {
-                    obra.vales.push({
-                        id: Date.now().toString(),
-                        descricao: document.getElementById('vale-descricao').value,
-                        valor: parseFloat(document.getElementById('vale-valor').value) || 0,
-                        data: document.getElementById('vale-data').value
-                    });
-                    
-                    document.getElementById('modal-novo-vale').classList.add('hidden');
-                    document.getElementById('form-novo-vale').reset();
-                    
-                    try {
-                        await salvarDados();
-                        atualizarInterface();
-                    } catch (error) {
-                        console.error("Erro ao salvar vale:", error);
-                        mostrarMensagem("Erro ao salvar vale", true);
-                    }
-                }
-            });
         }
     </script>
 </body>
